@@ -1,4 +1,4 @@
-from adapters import Gemma3Adapter
+from adapters import gemma3
 
 ai = Gemma3Adapter()
 result = ai.generate("Testing AI shell")
