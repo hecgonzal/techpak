@@ -1,0 +1,10 @@
+
+
+{
+    "device_alias": "laptop",
+    "device_id": "",
+    "device_network": "online",
+    "vpn":"off",
+    "device_battery": "100%",
+    "device_thermal": "normal"
+}

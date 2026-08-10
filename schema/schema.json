@@ -1,0 +1,74 @@
+{
+  "event_id": "",
+  "device_id": "",
+  "sequence": 0,
+  "session_id": "",
+  "conversation_id": "",
+  "timestamp": "",
+
+  "location":{
+    "lat": null,
+    "lon": null,
+    "source": "",
+    "context_location": ""
+  },
+
+  "device": {
+    "device_alias":"",
+    "device_battery": "",
+    "device_thermal": "",
+    "vpn": ""
+  },
+
+  "environment": {
+    "temp":"",
+    "humidity": "",
+    "air_quality": "",
+    "noise_level": "",
+    "light_level": ""
+  },
+
+  "user_state": {
+    "mood": "",
+    "stress": "",
+    "fatigue": "",
+    "health_flags": []
+  },
+
+  "conversation": {
+    "call": "",
+    "response": "",
+    "topic": "",
+    "intent": "",
+    "tags": []
+  },
+
+  "memory": {
+    "importance": 0,
+    "type": "",
+    "expiry": null
+  },
+
+  "model": {
+    "name": "",
+    "version": "",
+    "temperature": null,
+    "tokens_in": 0,
+    "tokens_out": 0,
+    "latency_ms": 0
+  },
+
+  "system": {
+    "network_status": "",
+    "connected_devices": [],
+    "pack_board_status": ""
+  },
+
+  "command": null,
+  "error": null,
+
+  "meta": {
+    "schema_version": "2.0",
+    "notes": "conext_location, topic, intent, tags, and user_state will be ai generated"
+  }
+}
