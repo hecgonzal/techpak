@@ -1,9 +1,9 @@
 import uuid
-from utils.timestamp import now
-from config import load_device_config
+from . .utils.timestamp import now
+from config.shell_config import ShellConfig
 
 def build_entry(adapter_output):
-    device = load_device_config()
+    device = ShellConfig()
 
     return {
         "session_id": str(uuid.uuid4()),
