@@ -1,6 +1,6 @@
 import json
 import os
-from . .utils.timestamp import now
+from .. import time_utility
 from config.shell_config import ShellConfig
 
 def append_log(entry, path="logs/test.jsonl"):

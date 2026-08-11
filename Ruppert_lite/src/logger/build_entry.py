@@ -1,5 +1,5 @@
 import uuid
-from . .utils.timestamp import now
+from .. import time_utility
 from config.shell_config import ShellConfig
 
 def build_entry(adapter_output):
