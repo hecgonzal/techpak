@@ -1,8 +1,11 @@
+import os
 import json
 
 class ShellConfig:
     def __init__(self, path="config/device.json"):
-        with open(path, "r", encoding="utf-8") as f:
+        base = os.path.dirname(__file__)
+        device_path =os.path.join(base, "device.json")
+        with open(device_path, "r", encoding="utf-8") as f:
             data = json.load(f)
 
         self.device_alias = data["device_alias"]
