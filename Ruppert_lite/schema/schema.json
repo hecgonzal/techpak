@@ -16,6 +16,8 @@
   "device": {
     "device_alias":"",
     "device_battery": "",
+    "device_plugged": "",
+    "device_secsleft": "",
     "device_thermal": "",
     "vpn": ""
   },

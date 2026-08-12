@@ -1,1 +1,3 @@
-from . import timestamp
+from .timestamp import now
+
+now = now()

@@ -1,15 +1,15 @@
 import uuid
-from .. import time_utility
+from ..time_utility import now
 from config.shell_config import ShellConfig
+from system.battery import get_battery_info
 
 def build_entry(adapter_output):
     device = ShellConfig()
+    battery_info = get_battery_info()
 
     return {
         "session_id": str(uuid.uuid4()),
-        "date": now().split("T")[0],
-        "time": now().split("T")[1],
-        "timestamp": now(),
+        "timestamp": now,
 
         "location": {
             "lat": None,
@@ -19,12 +19,14 @@ def build_entry(adapter_output):
         },
 
         "device": {
-            "device_alias": device["device_alias"],
-            "device_id": device["device_id"],
-            "device_battery": device.get("device_battery", ""),
-            "device_thermal": device.get("device_thermal", ""),
-            "device_network": device.get("device_network", ""),
-            "vpn": device.get("vpn", "")
+            "device_alias": getattr(device, "device_alias", ""),
+            "device_id": getattr(device, "device_id", ""),
+            "device_battery": battery_info.get("percent", None),
+            "device_plugged": battery_info.get("plugged", None),
+            "device_secsleft": battery_info.get("secsleft", None),
+            "device_thermal": getattr(device, "device_thermal", ""),
+            "device_network": getattr(device, "device_network", ""),
+            "vpn": getattr(device, "vpn", "")
         },
 
         "environment": {
@@ -66,7 +68,7 @@ def build_entry(adapter_output):
         },
 
         "system": {
-            "network_status": device.get("device_network", ""),
+            "network_status": "",
             "connected_devices": [],
             "pack_board_status": ""
         },

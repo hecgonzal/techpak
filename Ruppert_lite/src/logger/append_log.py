@@ -3,7 +3,7 @@ import os
 from .. import time_utility
 from config.shell_config import ShellConfig
 
-def append_log(entry, path="logs/test.jsonl"):
+def append_log(entry, path="Ruppert_lite/logs/testlog.jsonl"):
     """Append a JSON-serializable entry to a newline-delimited JSON file.
 
     Ensures the target directory exists. Returns True on success, False on failure.
