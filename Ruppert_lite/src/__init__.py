@@ -1,5 +1,4 @@
 
-from .logger import append_log, load_schema, build_entry
-
-from .time_utility import timestamp
+from .logger import LoggingTools
+from .time_utility import TimeUtility
 

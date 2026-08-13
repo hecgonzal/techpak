@@ -1,3 +1,5 @@
-from .timestamp import now
+from .timestamp import timestamp 
 
-now = now()
+class TimeUtility:
+    def __init__(self):
+        self.now = timestamp()

@@ -1,14 +1,17 @@
 import adapters
 import os
 from adapters import Gemma3Adapter
-from src.logger import append_log, load_schema, build_entry
+from src.logger import LoggingTools
+from config.shell_config import ShellConfig
 
-
+logging_tools = LoggingTools()
 ai = Gemma3Adapter()
+
 prompt = ai.generate("Testing AI shell")
-entry = build_entry(prompt)
-success = append_log(entry, path="Ruppert_lite/logs/testlog.jsonl")
+
+entry = LoggingTools().build_entry(prompt)
+success = LoggingTools().append(entry)
 print("Entry Content:", entry)
 print("Append success:", success)
-print("Absolute path:", os.path.abspath("Ruppert_lite/logs/testlog.jsonl"))
+print("Absolute path:", os.path.abspath(logging_tools.shell_config.log_path))
 

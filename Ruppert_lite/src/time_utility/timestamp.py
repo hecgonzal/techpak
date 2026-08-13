@@ -1,4 +1,4 @@
 from datetime import datetime, timezone
 
-def now():
+def timestamp():
     return datetime.now(timezone.utc).isoformat()

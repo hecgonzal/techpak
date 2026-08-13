@@ -1,15 +1,15 @@
 import uuid
-from ..time_utility import now
+from ..time_utility import TimeUtility
 from config.shell_config import ShellConfig
-from system.battery import get_battery_info
+from system import SystemTools
 
 def build_entry(adapter_output):
-    device = ShellConfig()
-    battery_info = get_battery_info()
-
+    device_config = ShellConfig()
+    time_utility = TimeUtility()
+    system = SystemTools()
     return {
         "session_id": str(uuid.uuid4()),
-        "timestamp": now,
+        "timestamp": time_utility.now,
 
         "location": {
             "lat": None,
@@ -19,14 +19,14 @@ def build_entry(adapter_output):
         },
 
         "device": {
-            "device_alias": getattr(device, "device_alias", ""),
-            "device_id": getattr(device, "device_id", ""),
-            "device_battery": battery_info.get("percent", None),
-            "device_plugged": battery_info.get("plugged", None),
-            "device_secsleft": battery_info.get("secsleft", None),
-            "device_thermal": getattr(device, "device_thermal", ""),
-            "device_network": getattr(device, "device_network", ""),
-            "vpn": getattr(device, "vpn", "")
+            "device_alias": getattr(device_config, "device_alias", ""),
+            "device_id": getattr(device_config, "device_id", ""),
+            "device_battery": system.battery_info.get("percent", None),
+            "device_plugged": system.battery_info.get("plugged", None),
+            "device_secsleft": system.battery_info.get("secsleft", None),
+            "device_thermal": getattr(device_config, "device_thermal", ""),
+            "device_network": getattr(device_config, "device_network", ""),
+            "vpn": getattr(device_config, "vpn", "")
         },
 
         "environment": {
@@ -68,8 +68,8 @@ def build_entry(adapter_output):
         },
 
         "system": {
-            "network_status": "",
-            "connected_devices": [],
+            "network_status": system.network_info.get("status", ""),
+            "connected_devices": system.network_info.get("connected_devices", []),
             "pack_board_status": ""
         },
 

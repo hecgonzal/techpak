@@ -1,13 +1,10 @@
+# logger/append_log.py
 import json
 import os
-from .. import time_utility
-from config.shell_config import ShellConfig
 
-def append_log(entry, path="Ruppert_lite/logs/testlog.jsonl"):
-    """Append a JSON-serializable entry to a newline-delimited JSON file.
+def append_log(entry, path):
+    """Append a JSON-serializable entry to a newline-delimited JSON file."""
 
-    Ensures the target directory exists. Returns True on success, False on failure.
-    """
     dirpath = os.path.dirname(path)
     if dirpath and not os.path.exists(dirpath):
         os.makedirs(dirpath, exist_ok=True)

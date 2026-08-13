@@ -14,6 +14,7 @@ class ShellConfig:
         self.vpn = data["vpn"]
         self.device_battery = data["device_battery"]
         self.device_thermal = data["device_thermal"]
+        self.log_path = data.get("log_path", "Ruppert_lite/logs/testlog.jsonl")
 
     def to_dict(self):
         """Return config as a dictionary for embedding in logs."""

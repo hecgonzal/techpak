@@ -6,5 +6,7 @@
     "device_network": "online",
     "vpn":"off",
     "device_battery": "100%",
-    "device_thermal": "normal"
+    "device_thermal": "normal",
+
+    "log_path": "Ruppert_lite/logs/testlog.jsonl"
 }
