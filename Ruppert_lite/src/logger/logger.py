@@ -1,7 +1,38 @@
+
+
+import os
+import json
 import uuid
-from ..time_utility import TimeUtility
-from config.shell_config import ShellConfig
+
+from config import ShellConfig
 from system import SystemTools
+from ..time_utility import TimeUtility
+
+def append_log(entry, path):
+    """Append a JSON-serializable entry to a newline-delimited JSON file."""
+
+    dirpath = os.path.dirname(path)
+    if dirpath and not os.path.exists(dirpath):
+        os.makedirs(dirpath, exist_ok=True)
+
+    try:
+        text = json.dumps(entry, ensure_ascii=False)
+    except (TypeError, ValueError):
+        return False
+
+    try:
+        with open(path, "a", encoding="utf-8") as f:
+            f.write(text + "\n")
+    except OSError:
+        return False
+
+    return True
+
+
+def load_schema():
+    with open("schema/schema.json") as f:
+        return json.load(f)
+
 
 def build_entry(adapter_output):
     device_config = ShellConfig()

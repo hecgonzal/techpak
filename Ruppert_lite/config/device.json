@@ -8,5 +8,8 @@
     "device_battery": "100%",
     "device_thermal": "normal",
 
-    "log_path": "Ruppert_lite/logs/testlog.jsonl"
+    "log_path": "Ruppert_lite/logs/testlog.jsonl",
+
+    "ai_model": "Gemma3Adapter",
+    "rupert_shell_version": "0.1"
 }

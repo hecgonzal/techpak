@@ -6,7 +6,7 @@ class SystemTools:
         self.battery_info = battery()
         self.network_info = network()
 
-    def battery(self, field=None):
+    def battery(self, field=None): # example usage: system.battery("percent")
         if field:
             return self.battery_info.get(field, None)
         return self.battery_info
