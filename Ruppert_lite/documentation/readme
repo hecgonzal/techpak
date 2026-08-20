@@ -1,0 +1,194 @@
+Techpack System Architecture Specification
+Version 0.1 — Draft
+
+Overview
+    Techpack is a multi-device hub inside a backpack to allow for inventory logging, health metric/enviornmental conditions tracking, and peripheral device powering.
+
+    Ruppert-lite is a shell build around utilizing CLI AI's. The shell will be responsible for serializing and logging data from other devices, with the AI component utilizing the logs to make data recollection better and discourage hallucination. Rupert will be the user's primary means of accessing this data when a gui is not active. Long term smart glass integration will allow Ruppert to listen to audio commands/converstations, potentially logging visually identified objects as well,
+
+
+This document defines the boot architecture, service layout, runtime model, and security policies for the Techpack ecosystem.
+
+Hardware + Boot Architecture-
+  Must wakeup from network events, sensor events, or user events.
+  Boot order:
+    Firmware → Bootloader → Minimal Arch CoreOS → SystemServices → (Screen detected?) → SystemServicesGUI → Runtime/Apps
+      Minimal Arch CoreOS
+        Reproducable kernal config for x86/ARM for predictable deivce tree overlay-no heavy desktop enviornment loaded, only required packages
+    Safe/Reset Mode:
+      Boot device with only  logging and network controls
+    
+System Architecture
+  SystemServices: always on, ultra-lite, not directly user friendly
+  SystemServicesGUI: loaded only when screen is detected
+    #Each device will be capable of connecting to a screen and displaying general info+controls, however they will operate at a lower power without doing so
+
+  SystemServices (Lite, Network-Safe, Always-On)
+    These daemons form the Techpack OS layer.
+    All devices run these unless restricted by profile.
+
+      tp-sysinfo (System telemetry aggregator)
+        Responsibilities:
+          CPU load
+          memory usage
+          battery/thermal
+          uptime
+          device capability flags
+        Notes: Wraps Linux primitives into a unified API.
+
+      tp-netlink (Network presence + device discovery)
+        Responsibilities:
+          broadcast device ID
+          capability flags
+          heartbeat
+          mesh presence
+        Notes: Foundation for inter-device awareness.
+
+      tp-msgbus (Interdevice communication layer)
+        Responsibilities:
+          distributed IPC
+          publish/subscribe channels
+          command routing
+          telemetry streaming
+        Notes: Backbone of Techpack communication.
+
+      tp-authlite (Lightweight identity + key exchange)
+        Responsibilities:
+          per-device identity keys
+          session tokens
+          capability-based permissions
+        Notes: Prevents impersonation and cross-device compromise.
+
+      tp-packboard (Sensor ingestion daemon)
+        Responsibilities:
+          packboard sensor data
+          wearable telemetry
+          environmental readings
+        Notes: Runs on wearable/packboard devices.
+
+      tp-syncd (State + file synchronization)
+        Responsibilities:
+          delta-based sync
+          config propagation
+          selective log sharing
+        Notes: rsync-lite optimized for Techpack.
+
+      tp-ruppertlog (Distributed logging backend)
+        Responsibilities:
+          JSONL append
+          schema registry
+          log streaming
+        Notes: Backend for Ruppert-lite.
+
+      tp-configd (Configuration + policy enforcement)
+        Responsibilities:
+          device profiles
+          runtime flags
+          mode switching (low-power, lockout, etc.)
+        Notes: Central policy engine.
+
+      tp-healthstats (Health + fitness metrics engine)
+        Responsibilities:
+          hydration
+          caloric burn
+          sleep flags
+          heart rate trends
+        Notes: Converts raw sensor data into meaningful metrics.
+
+      tp-updater (OTA updates for Techpack services)
+        Responsibilities:
+          version tracking
+          patch deltas
+          service restarts
+       Notes: Does NOT update the OS — only Techpack modules.
+
+  SystemServicesGUI (Screen-Detected Only)
+    -Device dependent Screens optional
+    -Smartglass specific interpreations of programs
+
+      tp-dashboard: Unified UI for telemetry, packboard, health, and network.
+
+      tp-notify: Notification center + toast manager. 
+
+      tp-settings-ui: Graphical configuration editor.
+
+      tp-filebrowser: Lightweight file navigator.
+
+      tp-visualizer: Charts, graphs, packboard maps, health visualizations.
+
+Runtime / Apps Layer
+  Ruppert-lite
+    Responsibilities:
+        logger
+        data access point
+        query engine
+        historical metrics store
+    This is the “Techpack brain.”
+  Pacman Tools
+    Contains:
+      Code
+      techpack-tools
+      techpack-services
+      techpack-gui
+    Any device can install these to join the ecosystem.
+
+Config + Policy Architecture
+  Predefined file access
+  Ex
+    workstation
+    brainboard
+    laptop
+    packboard
+    wearable
+    server
+    browse (profile including GUI, internetbrowser+adblock, no persistent memory changes)
+    guest (for when unregistered devices are added on network)
+
+Local Logs
+  Each device maintains:
+    system logs (journald)
+    Techpack logs (tp-ruppertlog)
+    health logs (tp-healthstats)
+    Sync rules determine what is shared.
+
+Segregated Permissions Structure
+  per-device identity keys
+  capability flags
+  profile-based restrictions
+  sandboxing via systemd + namespaces
+  tp-msgbus ACLs
+
+  Example:
+    A hacked wearable cannot modify workstation configs or impersonate another device.
+
+Directory Structure (inprogress)
+Code
+techpack/
+  docs/
+    architecture.md
+    services.md
+    profiles.md
+    security.md
+
+  services/
+    tp-sysinfo
+    tp-netlink
+    tp-msgbus
+    tp-authlite
+    tp-packboard
+    tp-syncd
+    tp-ruppertlog
+    tp-configd
+    tp-healthstats
+    tp-updater
+
+  services_gui/
+    tp-dashboard
+    tp-notify
+    tp-settings-ui
+    tp-filebrowser
+    tp-visualizer
+
+  runtime/
+    ruppert-lite/
+    tools/
