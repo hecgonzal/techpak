@@ -1,169 +1,359 @@
-Techpack System Architecture Specification
-Version 0.1 — Draft
+# Techpack System Architecture Specification
 
-Overview
-    Techpack is a multi-device hub inside a backpack to allow for inventory logging, health metric/enviornmental conditions tracking, and peripheral device powering.
+> Version 0.1 — Draft
 
-    Ruppert-lite is a shell build around utilizing CLI AI's. The shell will be responsible for serializing and logging data from other devices, with the AI component utilizing the logs to make data recollection better and discourage hallucination. Rupert will be the user's primary means of accessing this data when a gui is not active. Long term smart glass integration will allow Ruppert to listen to audio commands/converstations, potentially logging visually identified objects as well,
+## Overview
 
+Techpack is a multi-device hub designed for inventory logging, health and environmental monitoring, and peripheral device power management. It is intended to operate as a compact, resilient ecosystem inside a backpack or wearable setup, with coordinated device services that share telemetry, logs, and user permissions across a network of connected hardware.
+
+Ruppert-lite is a command-line shell built around AI-assisted tooling. It serializes and logs device data, provides a primary access path when a graphical interface is unavailable, and relies on logged information to improve recall and reduce hallucination in AI-driven interactions. Long-term integration with smart glasses may allow Ruppert-lite to interpret audio commands and visually identify objects for logging.
+
+Technet services devices on the network and distributes logs/state across devices, creating system durability and flexability 
 
 This document defines the boot architecture, service layout, runtime model, and security policies for the Techpack ecosystem.
 
-Hardware + Boot Architecture-
-  Must wakeup from network events, sensor events, or user events.
-  Boot order:
-    Firmware → Bootloader → Minimal Arch CoreOS → SystemServices → (Screen detected?) → SystemServicesGUI → Runtime/Apps
-      Minimal Arch CoreOS
-        Reproducable kernal config for x86/ARM for predictable deivce tree overlay-no heavy desktop enviornment loaded, only required packages
-    Safe/Reset Mode:
-      Boot device with only  logging and network controls
-    
-System Architecture
-  SystemServices: always on, ultra-lite, not directly user friendly
-  SystemServicesGUI: loaded only when screen is detected
-    #Each device will be capable of connecting to a screen and displaying general info+controls, however they will operate at a lower power without doing so
+## Table of Contents
 
-  SystemServices (Lite, Network-Safe, Always-On)
-    These daemons form the Techpack OS layer.
-    All devices run these unless restricted by profile.
+- [Hardware and Boot Architecture](#hardware-and-boot-architecture)
+- [System Architecture](#system-architecture)
+- [Runtime and Applications](#runtime-and-applications)
+- [Configuration and Policy Architecture](#configuration-and-policy-architecture)
+- [Directory Structure](#directory-structure)
 
-      tp-sysinfo (System telemetry aggregator)
-        Responsibilities:
-          CPU load
-          memory usage
-          battery/thermal
-          uptime
-          device capability flags
-        Notes: Wraps Linux primitives into a unified API.
+## Hardware and Boot Architecture
 
-      tp-netlink (Network presence + device discovery)
-        Responsibilities:
-          broadcast device ID
-          capability flags
-          heartbeat
-          mesh presence
-        Notes: Foundation for inter-device awareness.
+Techpack devices must wake from the following event types:
 
-      tp-msgbus (Interdevice communication layer)
-        Responsibilities:
-          distributed IPC
-          publish/subscribe channels
-          command routing
-          telemetry streaming
-        Notes: Backbone of Techpack communication.
+- Network events
+- Sensor events
+- User events
 
-      tp-authlite (Lightweight identity + key exchange)
-        Responsibilities:
-          per-device identity keys
-          session tokens
-          capability-based permissions
-        Notes: Prevents impersonation and cross-device compromise.
+### Boot Order
 
-      tp-packboard (Sensor ingestion daemon)
-        Responsibilities:
-          packboard sensor data
-          wearable telemetry
-          environmental readings
-        Notes: Runs on wearable/packboard devices.
+```text
+Firmware → Bootloader → Minimal Arch CoreOS → System Services → (Screen detected?) → System Services GUI → Runtime / Apps
+```
 
-      tp-syncd (State + file synchronization)
-        Responsibilities:
-          delta-based sync
-          config propagation
-          selective log sharing
-        Notes: rsync-lite optimized for Techpack.
+### Minimal Arch CoreOS
 
-      tp-ruppertlog (Distributed logging backend)
-        Responsibilities:
-          JSONL append
-          schema registry
-          log streaming
-        Notes: Backend for Ruppert-lite.
+The base operating environment is intentionally minimal and reproducible:
 
-      tp-configd (Configuration + policy enforcement)
-        Responsibilities:
-          device profiles
-          runtime flags
-          mode switching (low-power, lockout, etc.)
-        Notes: Central policy engine.
+- Reproducible kernel configuration for x86/ARM
+- Predictable device tree overlays
+- No heavy desktop environment
+- Only required packages installed
 
-      tp-healthstats (Health + fitness metrics engine)
-        Responsibilities:
-          hydration
-          caloric burn
-          sleep flags
-          heart rate trends
-        Notes: Converts raw sensor data into meaningful metrics.
+### Safe / Reset Mode
 
-      tp-updater (OTA updates for Techpack services)
-        Responsibilities:
-          version tracking
-          patch deltas
-          service restarts
-       Notes: Does NOT update the OS — only Techpack modules.
+During recovery or restricted operation, the system boots with only logging and network controls active.
 
-  SystemServicesGUI (Screen-Detected Only)
-    -Device dependent Screens optional
-    -Smartglass specific interpreations of programs
+## System Architecture
 
-      tp-dashboard: Unified UI for telemetry, packboard, health, and network.
+### System Services (Lite, Network-Safe, Always-On)
 
-      tp-notify: Notification center + toast manager. 
+These daemons form the Techpack OS layer and run on all devices unless restricted by device profile.
 
-      tp-settings-ui: Graphical configuration editor.
+- PackService (Active Network Operations)
+  - `tp-sysinfo` — System telemetry aggregator
+    - CPU load
+    - Memory usage
+    - Battery and thermal data
+    - Uptime
+    - Device capability flags
+    - Wraps Linux primitives into a unified API
+  - `tp-packboard` — Sensor ingestion daemon
+    - Packboard sensor data
+    - Wearable telemetry
+    - Environmental readings
+    - Runs on wearable and packboard devices
+  - `tp-ruppertlog` — Distributed logging backend
+    - JSONL append
+    - Schema registry
+    - Log streaming
+    - Backend for Ruppert-lite
+  - `tp-syncd` — State and file synchronization
+    - Delta-based sync
+    - Config propagation
+    - Selective log sharing
+    - rsync-lite optimized for Techpack
+  - `tp-healthstats` — Health and fitness metrics engine
+    - Hydration
+    - Caloric burn
+    - Sleep flags
+    - Heart rate trends
+    - Converts raw sensor data into meaningful metrics
 
-      tp-filebrowser: Lightweight file navigator.
+- TechNet (Operations required for intra-network communication)
+  - `tp-netlink` — Network presence and device discovery
+    - Broadcast device ID
+    - Capability flags
+    - Heartbeat
+    - Mesh presence
+    - Foundation for inter-device awareness
+  - `tp-msgbus` — Inter-device communication layer
+    - Distributed IPC
+    - Publish/subscribe channels
+    - Command routing
+    - Telemetry streaming
+    - Backbone of Techpack communication
+  - `tp-authlite` — Network authetication
+  - `tp-registry` — Device Registry/Capability tracking
+    - known devices
+    - identity keys
+    - capability flags
+    - trust state
+    - last-seen timestamps
 
-      tp-visualizer: Charts, graphs, packboard maps, health visualizations.
+- TechNetAdmin (Management for permissions and settings)
+  - `tp-configd` — Configuration and policy enforcement
+    - Device profiles
+    - Runtime flags
+    - Mode switching for low-power and lockout states
+    - Central policy engine
+  - `tp-updater` — OTA updates for Techpack services
+    - Version tracking
+    - Patch deltas
+    - Service restarts
+    - Does not update the OS; only Techpack modules
+  - `tp-authorizor` — User/Device Management
+    - user profile permissions
+    - device profile enforcement
+    - device capability 
+    - access control
 
-Runtime / Apps Layer
-  Ruppert-lite
-    Responsibilities:
-        logger
-        data access point
-        query engine
-        historical metrics store
-        Never an authority, only used for retrival of logs/data or to run
-    This is the “Techpack brain.”
-  Pacman Tools
-    Contains:
-      Code
-      techpack-tools
-      techpack-services
-      techpack-gui
-    Any device can install these to join the ecosystem.
+### System Services GUI (Screen-Detected Only)
 
-Config + Policy Architecture
-  Predefined file access
-  Ex
-    workstation
-    brainboard
-    laptop
-    packboard
-    wearable
-    server
-    browse (profile including GUI, internetbrowser+adblock, no persistent memory changes)
-    guest (for when unregistered devices are added on network)
+These services operate when a screen is available and provide a lower-power interface for devices that do not always run a full display stack.
 
-Local Logs
-  Each device maintains:
-    system logs (journald)
-    Techpack logs (tp-ruppertlog)
-    health logs (tp-healthstats)
-    Sync rules determine what is shared.
+- `tp-dashboard` — Unified UI for telemetry, packboard, health, and network
+- `tp-notify` — Notification center and toast manager
+- `tp-settings-ui` — Graphical configuration editor
+- `tp-filebrowser` — Lightweight file navigator
+- `tp-visualizer` — Charts, graphs, packboard maps, and health visualizations
 
-Segregated Permissions Structure
-  per-device identity keys
-  capability flags
-  profile-based restrictions
-  sandboxing via systemd + namespaces
-  tp-msgbus ACLs
+## Runtime and Applications
 
-  Example:
-    A hacked wearable cannot modify workstation configs or impersonate another device.
+### Ruppert-lite
 
-Directory Structure (inprogress)
-Code
+Ruppert-lite is the primary CLI-based application interface for the Techpack ecosystem.
+
+It acts as:
+
+- A logger
+- A data access point
+- A query engine
+- A historical metrics store
+- A non-authoritative retrieval layer for logs and commands
+
+This is the "Techpack brain" and is intended to retrieve and query data without acting as a source of authority over the system.
+
+### Pacman Tools
+
+The Pacman toolset includes:
+
+- `techpack-tools`
+- `techpack-services`
+- `techpack-gui`
+
+Any device may install these tools to participate in the broader ecosystem.
+
+## Configuration and Policy Architecture
+### Device Profiles
+
+Device profiles determine:
+
+- Hardware capabilities
+- Service eligibility
+- Job priority for Technet network services
+- Power modes
+- Sensor availability
+
+Example profiles include:
+
+- Workstation
+- Brainboard
+- Laptop
+- Packboard
+- Wearable
+- Server
+### Techpack User Profiles
+
+    User profiles define **who the user is**, **what they can do**, and **how their identity behaves across devices**. Unlike device profiles, which determine hardware capability and service priority, **user profiles are synchronized across all devices** and follow the user wherever they log in.
+
+    User profiles behave like Arch Linux user accounts with Techpack capability overlays.
+
+    ## Top-Level User Profiles
+
+      ### 1. Admin (Full Access)
+
+      The Admin profile is the highest-privilege user identity.
+
+      * Read/write/execute for all Techpack services
+      * Full access to Technet, Packservice, and TechNetAdmin
+      * Can modify device profiles
+      * Can modify user profiles
+      * Can run any GUI component
+      * Can manage any device when connected to a screen
+      * Can initiate OTA updates
+      * Can modify system configuration
+      * Can view and modify all logs
+      * Can run Ruppert-lite with full authority
+
+      Master Account
+
+      ### 2. Guest (Ephemeral Access)
+
+      The Guest profile is designed for unregistered or temporary users.
+
+      * Can browse
+      * Can use select tools
+      * Can run GUI in browse mode
+      * Cannot save persistent data
+      * Cannot modify configuration
+      * Cannot modify logs
+      * Cannot run Packservice or TechNetAdmin services
+      * Cannot access sensitive telemetry
+      * Cannot participate in sync durability
+
+      Shared device, device joining to network
+
+      ### 3. Dev (Development Mode)
+
+      The Dev profile is your general-use development identity
+      This profile is intentionally flexible and will evolve as Techpack gains durability features for project state, testing environments, and sandboxing.
+
+      * Full read/write access to development tools
+      * Access to Packservice logs and metrics
+      * Access to Technet services for testing
+      * Can run Ruppert-lite with extended debugging
+      * Can modify local configs but not global policies
+      * Can create durable project states (future feature)
+      * Can run device scripts for testing
+      * Cannot modify Admin-level policies
+      * Cannot modify other user profiles
+
+      user profile for coding, testing, and debugging.
+
+
+
+Every device runs its automation scripts under a **user profile named after the device**.
+
+Examples:
+
+* `wearable`
+* `packboard`
+* `workstation`
+* `brainboard`
+
+These are **not human users** — they are **service identities**.
+
+**Capabilities:**
+
+* Restricted to the device’s own logs
+* Restricted to the device’s own sensors
+* Can publish telemetry
+* Can authenticate via `tp-authlite`
+* Can participate in sync replication
+* Cannot modify global configuration
+* Cannot impersonate other devices
+* Cannot access GUI components
+
+**Use Case:** Automation, sensor ingestion, heartbeat, telemetry, and replication.
+
+# User Profile Capability Model
+
+Each user profile maps to a capability set. Capabilities determine what services the user can interact with.
+
+## Admin
+
+```yaml
+capabilities:
+  - read.all
+  - write.all
+  - exec.all
+  - config.modify
+  - device.manage
+  - logs.modify
+  - profiles.modify
+  - updater.run
+  - gui.full
+  - ruppert.full
+```
+
+## Guest
+
+```yaml
+capabilities:
+  - gui.browse
+  - tools.limited
+
+deny:
+  - write.any
+  - exec.any
+  - config.modify
+  - logs.modify
+  - sync.persist
+```
+
+## Dev
+
+```yaml
+capabilities:
+  - read.all
+  - write.dev
+  - exec.dev
+  - gui.full
+  - ruppert.debug
+  - config.local
+
+deny:
+  - config.global
+  - profiles.modify
+  - updater.run
+```
+
+## Device Script Profiles
+
+```yaml
+capabilities:
+  - telemetry.publish
+  - logs.append.self
+  - sync.partial
+  - identity.authenticate
+
+deny:
+  - gui.any
+  - config.modify
+  - logs.modify.global
+  - profiles.modify
+```
+
+
+### Local Logs
+
+Each device maintains:
+
+- System logs (journald)
+- Techpack logs (`tp-ruppertlog`)
+- Health logs (`tp-healthstats`)
+
+Synchronization rules determine what data is shared across the network.
+
+### Segregated Permissions Structure
+
+The ecosystem uses a layered permissions model built on:
+
+- Per-device identity keys
+- Capability flags
+- Profile-based restrictions
+- Sandboxing via systemd and namespaces
+- `tp-msgbus` ACLs
+
+Example: a compromised wearable cannot modify workstation configurations or impersonate another device.
+
+## Directory Structure
+
+```text
 techpack/
   docs/
     architecture.md
@@ -172,24 +362,41 @@ techpack/
     security.md
 
   services/
-    tp-sysinfo
-    tp-netlink
-    tp-msgbus
-    tp-authlite
-    tp-packboard
-    tp-syncd
-    tp-ruppertlog
-    tp-configd
-    tp-healthstats
-    tp-updater
-
-  services_gui/
-    tp-dashboard
-    tp-notify
-    tp-settings-ui
-    tp-filebrowser
-    tp-visualizer
+    
+    TechNet/
+      tp-netlink/
+      tp-msgbus/
+      tp-authlite/
+      tp-registry/
+    
+    Packservice/
+      tp-sysinfo/
+      tp-healthstats/
+      tp-packboard/
+      tp-syncd/
+      tp-ruppertlog/
+    
+    TechNetAdmin/
+      tp-configd/
+      tp-authorizor/
+      tp-updater/
+    
+    ServicesGui/
+      tp-dashboard/
+      tp-notify/
+      tp-settings-ui/
+      tp-filebrowser/
+      tp-visualizer/
 
   runtime/
     ruppert-lite/
     tools/
+```
+
+## Status
+
+This project is currently in draft form and the architecture is still evolving as services and profiles are defined.
+
+---
+
+For additional context, see the active implementation files and project modules in this repository.
