@@ -1,0 +1,99 @@
+{
+  "schema_version": "1.0",
+  "timestamp": "",
+  "sequence": 0,
+
+  "device": {
+    "id": "",
+    "alias": "",
+    "type": "",
+    "architecture": "",
+    "degraded": false,
+    "degradation_flags": []
+  },
+
+  "cpu": {
+    "load_percent": null,
+    "load_average": [null, null, null],
+    "core_count": 0,
+    "frequency_mhz": null,
+    "degraded": false,
+    "degradation_flags": []
+  },
+
+  "memory": {
+    "used_percent": null,
+    "used_bytes": 0,
+    "available_bytes": 0,
+    "total_bytes": 0,
+    "degraded": false,
+    "degradation_flags": []
+  },
+
+  "storage": [
+    {
+      "mount": "",
+      "used_percent": null,
+      "used_bytes": 0,
+      "available_bytes": 0,
+      "total_bytes": 0,
+      "degraded": false,
+      "degradation_flags": []
+    }
+  ],
+
+  "battery": {
+    "percent": null,
+    "plugged": null,
+    "charging": null,
+    "seconds_remaining": null,
+    "degraded": false,
+    "degradation_flags": []
+  },
+
+  "thermal": {
+    "state": "unknown",
+    "sensors": [
+      {
+        "id": "",
+        "name": "",
+        "source": "",
+        "sensor_type": "",
+        "temperature_celsius": null
+      }
+    ],
+    "headroom_celsius": null,
+    "degraded": false,
+    "degradation_flags": []
+  },
+
+  "power": {
+    "mode": "",
+    "efficiency_score": null,
+    "degraded": false,
+    "degradation_flags": []
+  },
+
+  "runtime": {
+    "uptime_seconds": 0,
+    "boot_id": "",
+    "device_state": "",
+    "degraded": false,
+    "degradation_flags": []
+  },
+
+  "capabilities": {
+    "items": [],
+    "degraded": false,
+    "degradation_flags": []
+  },
+
+  "services": {
+    "tp_sysinfo": "",
+    "tp_netlink": "",
+    "tp_msgbus": "",
+    "tp_authlite": "",
+    "degraded": false,
+    "degradation_flags": []
+  }
+}

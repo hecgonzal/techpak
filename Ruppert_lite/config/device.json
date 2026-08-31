@@ -1,7 +1,9 @@
 
 
 {
+    "device_architecture": "x86",
     "device_alias": "laptop",
+    "device_type": "laptop",
     "device_id": "",
     "device_network": "online",
     "vpn":"off",

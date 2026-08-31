@@ -1,0 +1,280 @@
+╔════════════════════════════════════════════════════════════════╗
+║          🔒 SECURITY ARCHITECTURE 🔒                          ║
+╚════════════════════════════════════════════════════════════════╝
+
+Techpack is designed as a resilient local mesh of devices operating in a compact wearable or backpack environment. Security must protect network trust, command execution, file sync, and device identity without forcing heavy infrastructure or centralized authority. The design must remain suitable for low-power devices, temporary devices, and mixed device classes.
+
+┌─────────────────────────────────────────────────────────────┐
+│  🎯 SECURITY GOALS                                              │
+└─────────────────────────────────────────────────────────────┘
+
+The security model must satisfy the following:
+
+- Protect device identity against spoofing or impersonation
+- Prevent unauthorized command execution across the mesh
+- Restrict device administration to trusted authority layers
+- Allow manual onboarding for new devices without hard-coded universal trust
+- Ensure command replay and credential reuse are detectable
+- Preserve local operation when a device loses network connectivity
+- Keep implementation lightweight enough for Arch-based x86 and ARM devices
+
+┌─────────────────────────────────────────────────────────────┐
+│  ⚙️  CORE PRINCIPLES                                            │
+└─────────────────────────────────────────────────────────────┘
+
+The security model is intentionally layered and follows these rules:
+
+- PackService is never authority. It may collect telemetry and emit payloads, but it cannot authorize actions.
+- TechNet is responsible for packet creation, transport, and network discovery.
+- TechNetAdmin is the only authority layer for identity, permissions, verification, and admin actions.
+- MsgBus is a transport envelope only. It exposes only the headers required to route a packet.
+- Authorization is separated from payload content.
+
+┌─────────────────────────────────────────────────────────────┐
+│  ⚠️  THREAT MODEL                                               │
+└─────────────────────────────────────────────────────────────┘
+
+    System is susceptible at basically every level. Custom OS+Unique Packet design make hacking possible with adequete
+    effort/system understanding. I've identified all the risk vectors below, though by no means is this an exaughstive list
+
+        Packet: 
+            Malicious commands
+            Payload tampering
+            Replay attacks
+            Impersonation
+            Routing manipulation for tp_netlink
+            Packet flooding
+        Device: 
+            Comprimised device ownership
+            Unauthorized device connection
+        Network: 
+            Man in the middle
+            Session hijacking
+            Broadcast packets reveal total network size+capabilities
+        Internet: 
+            Cloud API's utilized by devices can return malicious data/inject data
+            Malicious updates
+            Remote Command injection (a cool feature if I can do it, a pretty lame one if everyone can)
+        Data:
+            Health metrics
+            Location data
+            Log+conversation leakage
+            Behavior profile (stuff we dont want advertisors buying)
+        Config:
+            Device policy alteration
+        syncd
+            State corruption
+            File injection
+        Physical
+            USB injection
+            Sensor spoofing
+            A stolen device
+    
+
+This model is intentionally aimed at local-device compromise, impersonation, replay, and unauthorized command execution, not full internet-scale adversary modeling.
+
+┌─────────────────────────────────────────────────────────────┐
+│  👤 IDENTITY MODEL                                              │
+└─────────────────────────────────────────────────────────────┘
+
+Each device must carry a stable device identity, distinct from user-facing aliases.
+
+- A device has a persistent self ID generated during registration or first secure onboarding
+- Device aliases are user-facing labels and may change
+- Device identity is for trust and accountability, not display
+- A device may also carry a temporary first-contact or mutual-trust identity for local mesh recognition
+
+This supports both durable identity and temporary peer trust without conflating the two concepts.
+
+┌─────────────────────────────────────────────────────────────┐
+│  🤝 FIRST-CONTACT ONBOARDING                                    │
+└─────────────────────────────────────────────────────────────┘
+
+First contact between two devices cannot be assumed safe by default. A network participant must prove identity before it is trusted.
+
+Techpack supports multiple bootstrap methods depending on the device type:
+
+- High-capability devices: factory-provisioned credentials or administrator-assisted onboarding
+- Low-capability devices: manual pairing, QR-based verification, or a secure local setup flow
+- Temporary guest devices: limited access only until explicit trust is granted
+
+A device must not automatically trust another device simply because it is present on the same subnet or mesh.
+
+┌─────────────────────────────────────────────────────────────┐
+│  🤜🤛 MUTUAL TRUST & FISTBUMP IDENTITY                          │
+└─────────────────────────────────────────────────────────────┘
+
+After a secure first contact, two devices may establish a mutual fistbump ID. This is a peer-specific trust record that is stored locally on both devices.
+
+The fistbump ID exists to support:
+
+- device-to-device trust recognition
+- replay detection
+- impersonation detection
+- local verification without a central registry
+
+This identity is not the same as a universal device ID and should not be treated as a global authority marker.
+
+┌─────────────────────────────────────────────────────────────┐
+│  📋 AUTHORIZATION MODEL                                         │
+└─────────────────────────────────────────────────────────────┘
+
+Authorization is intentionally separated from payload transit.
+
+A packet contains three layers:
+
+- MsgBus: routing only
+- Authorization: identity, trust, permission, and proof
+- Payload: command, telemetry, or state information
+
+This means a packet cannot be trusted just because it reached the right device. The receiving device must validate authorization before acting on the payload.
+
+┌─────────────────────────────────────────────────────────────┐
+│  🏆 PERMISSION TIERS                                            │
+└─────────────────────────────────────────────────────────────┘
+
+Permission levels should be defined in the authorization layer and enforced at command execution time.
+
+Suggested initial structure:
+
+- Tier 1: administrative actions
+  - command execution
+  - updates
+  - device reconfiguration
+  - permission changes
+- Tier 2: logging and local state access
+  - log reads
+  - retention or sync actions
+  - telemetry export
+- Tier 3: network-level actions
+  - discovery
+  - heartbeat
+  - mesh presence
+  - route propagation
+
+These tiers should be refined later, but the key rule is that higher-impact actions require stronger proof.
+
+┌─────────────────────────────────────────────────────────────┐
+│  👑 ADMIN AUTHORITY                                             │
+└─────────────────────────────────────────────────────────────┘
+
+A device may only act with authority when it can prove it is authorized by the local admin model.
+
+The admin authority layer must support:
+
+- manual user proof for administrative actions
+- device-level permission checks
+- temporary or delegated action approval
+- secure rejoin or recovery of a lost device
+- protection against stolen or replayed admin commands
+
+The admin proof should be scoped to specific actions and should not be treated as a permanent universal grant.
+
+┌─────────────────────────────────────────────────────────────┐
+│  🎫 SESSION TOKEN MODEL                                         │
+└─────────────────────────────────────────────────────────────┘
+
+Session tokens are required for transient trust windows, especially where commands are issued across the mesh.
+
+Session tokens should include:
+
+- device identity
+- session scope
+- expiration window
+- usage restrictions
+- proof of issuance by an authorized layer
+
+Tokens should not be accepted permanently. They should be short-lived and audited.
+
+┌─────────────────────────────────────────────────────────────┐
+│  ⏰ TIME-BASED COORDINATION                                      │
+└─────────────────────────────────────────────────────────────┘
+
+The ecosystem may optionally use a shared internal network calendar or synchronized clock window for replay protection and derived session material.
+
+This feature is useful only if:
+
+- clocks are reasonably synchronized
+- skew tolerances are defined
+- replay windows are bounded
+- fallback behavior is specified for drift
+
+This should be treated as an optional security enhancement, not the foundation of the entire trust model.
+
+┌─────────────────────────────────────────────────────────────┐
+│  🔐 ENCRYPTION & KEY HANDLING                                   │
+└─────────────────────────────────────────────────────────────┘
+
+Private keys and sensitive trust data must be stored in encrypted local storage. At minimum:
+
+- private keys must never be stored in plaintext
+- device registration data must be protected
+- authorization material must be isolated from payload logs
+- admin proof material must not be exposed in ordinary telemetry
+
+Encryption strategy should be lightweight and local-first, with the emphasis on device-local security rather than heavy central key infrastructure.
+
+┌─────────────────────────────────────────────────────────────┐
+│  🔄 RECOVERY & LOCKOUT                                          │
+└─────────────────────────────────────────────────────────────┘
+
+The system must define recovery behavior for:
+
+- lost or stolen devices
+- device re-registration
+- compromised peer devices
+- offline device rejoin
+- admin lockout scenarios
+
+A recovery path should exist without requiring a universal network key. Recovery must be explicit, auditable, and permission-scoped.
+
+┌─────────────────────────────────────────────────────────────┐
+│  📊 SECURITY LOGGING & AUDIT                                    │
+└─────────────────────────────────────────────────────────────┘
+
+Security events should be logged at the authorization layer:
+
+- new device trust establishment
+- failed permission checks
+- replay/reuse detection
+- token expiration
+- admin command attempts
+- device recovery and lockout actions
+
+Security logs should be separate from ordinary telemetry and should not be used as a general-purpose data store.
+
+┌─────────────────────────────────────────────────────────────┐
+│  ❓ OPEN DESIGN QUESTIONS                                        │
+└─────────────────────────────────────────────────────────────┘
+
+The following items must be decided before auth implementation begins:
+
+- What is the exact first-contact bootstrap flow?
+- Should auth be based on signed tokens, challenge-response, or a hybrid?
+- What is the trust lifetime for fistbump IDs?
+- What is the admin proof derivation model?
+- How is permission enforcement placed: centralized or distributed?
+- What is the recovery flow for a locked-out device?
+- What is the acceptable clock skew for any time-based security mechanism?
+
+┌─────────────────────────────────────────────────────────────┐
+│  📍 SECURITY SCOPE FOR THIS PROJECT PHASE                       │
+└─────────────────────────────────────────────────────────────┘
+
+For the current project phase, the following should be treated as required:
+
+- device identity
+- peer trust establishment
+- authorization separation from payload
+- layered permission model
+- admin proof flow
+- replay protection
+- encrypted local key material
+
+The following should be deferred until the trust model is finalized:
+
+- dynamic trust graph expansion
+- full policy engine
+- advanced revocation propagation
+- highly complex time-based key sequences
+- deep service-to-service federation

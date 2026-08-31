@@ -1,0 +1,16 @@
+{
+    "tp_msgbus": {
+    "source_device_id": "",
+    "destination": "",
+    "topic": "",
+    "timestamp": "",
+    "priority": ""
+},
+
+    "tp_netlink": {},
+    "tp_payload":{
+        "payload_type": "",
+        "payload_version": "1.0"
+        "content": {}
+    }
+}

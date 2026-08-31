@@ -1,0 +1,7 @@
+{
+  "source_device_id": "",
+  "source_device_alias": "",
+  "destination_device_id": "",
+  "destination_device_alias": "",
+  "priority": ""
+}

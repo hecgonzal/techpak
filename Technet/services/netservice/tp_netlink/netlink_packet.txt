@@ -1,0 +1,8 @@
+
+{
+    "hop_count": 1,
+    "mesh_route": [],
+    "link_quality": "",
+    "session_token": "",
+    "encryption": ""
+}
