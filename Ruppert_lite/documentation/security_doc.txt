@@ -24,11 +24,14 @@ The security model must satisfy the following:
 
 The security model is intentionally layered and follows these rules:
 
-- PackService is never authority. It may collect telemetry and emit payloads, but it cannot authorize actions.
-- TechNet is responsible for packet creation, transport, and network discovery.
-- TechNetAdmin is the only authority layer for identity, permissions, verification, and admin actions.
-- MsgBus is a transport envelope only. It exposes only the headers required to route a packet.
-- Authorization is separated from payload content.
+- PackService: No authority- collects information, emits packets, must request permissions. These are the project tools.
+- TechNet is responsible for packet creation, transport, and network discovery. The way the tools communicate.
+    - MsgBus is a transport envelope only. It exposes only the headers required to route a packet.
+- TechNetAdmin is the only authority layer for identity, permissions, verification, and admin actions. Permission for tools to operate.
+    - Authorization is separated from payload content.
+    - Device permissions are restricted
+
+
 
 ┌─────────────────────────────────────────────────────────────┐
 │  ⚠️  THREAT MODEL                                               │
@@ -71,7 +74,7 @@ The security model is intentionally layered and follows these rules:
             A stolen device
     
 
-This model is intentionally aimed at local-device compromise, impersonation, replay, and unauthorized command execution, not full internet-scale adversary modeling.
+This model is intentionally aimed at local-device compromise, impersonation, replay, and unauthorized command execution, not full internet-scale adversary modeling. Ideally, the network will be segregated enough by a VPN running on the BrainBoard that is monitoring traffic
 
 ┌─────────────────────────────────────────────────────────────┐
 │  👤 IDENTITY MODEL                                              │
@@ -80,9 +83,12 @@ This model is intentionally aimed at local-device compromise, impersonation, rep
 Each device must carry a stable device identity, distinct from user-facing aliases.
 
 - A device has a persistent self ID generated during registration or first secure onboarding
-- Device aliases are user-facing labels and may change
+- Device aliases are user-facing labels and may change in config
 - Device identity is for trust and accountability, not display
 - A device may also carry a temporary first-contact or mutual-trust identity for local mesh recognition
+- Temporary/unknown devices are generated an ID + an ID signifying low trust
+-Devices will create a "fistbump" ID on first contact, meaning each device will have unique ID's for each other device to prevent device impersonation
+    -On detection, packets from potentially corrupt device will be stored in logs on a segregated drive partition and Rupert+user will be notified
 
 This supports both durable identity and temporary peer trust without conflating the two concepts.
 
@@ -152,7 +158,7 @@ Suggested initial structure:
   - mesh presence
   - route propagation
 
-These tiers should be refined later, but the key rule is that higher-impact actions require stronger proof.
+These tiers should be refined later, but the key rule is that higher-impact actions require stronger proof with lower network access being accessable without network permissions.
 
 ┌─────────────────────────────────────────────────────────────┐
 │  👑 ADMIN AUTHORITY                                             │
@@ -162,7 +168,7 @@ A device may only act with authority when it can prove it is authorized by the l
 
 The admin authority layer must support:
 
-- manual user proof for administrative actions
+- manual user proof for administrative actions, intially performed by external trusted device
 - device-level permission checks
 - temporary or delegated action approval
 - secure rejoin or recovery of a lost device
@@ -180,7 +186,7 @@ Session tokens should include:
 
 - device identity
 - session scope
-- expiration window
+- expiration window (shorter means more commands processing)
 - usage restrictions
 - proof of issuance by an authorized layer
 
@@ -190,11 +196,11 @@ Tokens should not be accepted permanently. They should be short-lived and audite
 │  ⏰ TIME-BASED COORDINATION                                      │
 └─────────────────────────────────────────────────────────────┘
 
-The ecosystem may optionally use a shared internal network calendar or synchronized clock window for replay protection and derived session material.
+The ecosystem may optionally use a shared internal network calendar to mantain a consistent internal ecosystem and operate as another sign of devices intruding on network
 
 This feature is useful only if:
 
-- clocks are reasonably synchronized
+- clocks are reasonably synchronized (perhaps only kept up to the day, maybe hour)
 - skew tolerances are defined
 - replay windows are bounded
 - fallback behavior is specified for drift
@@ -250,12 +256,31 @@ Security logs should be separate from ordinary telemetry and should not be used 
 The following items must be decided before auth implementation begins:
 
 - What is the exact first-contact bootstrap flow?
+    1) TechOS install from drive/external device
+    2) First time user set up (new technet) OR option to connect to local TechNet using password created by user on intial setup. This process is a manual add.
+    3) On successful connecct, additional devices are added through further additional adds while less intelligent devices  will connect to host device where the add key must then be entered.
 - Should auth be based on signed tokens, challenge-response, or a hybrid?
+    
+    Intial authority will be granted with a challenge response, on passing the device will be assigned an authoirty token with an expiration of 1 hour
+
 - What is the trust lifetime for fistbump IDs?
+
+    For now, all trust will survive for one hour before requiring a refresh
+
 - What is the admin proof derivation model?
+
+    The hardest design question for security on this system.
+
 - How is permission enforcement placed: centralized or distributed?
+
+    Must be distrubuted 
+
 - What is the recovery flow for a locked-out device?
+
+    Reset of device + reconnection to network followed by a fresh update of local data from network
 - What is the acceptable clock skew for any time-based security mechanism?
+
+    1 hour until I have a good reason to suspect it isn't
 
 ┌─────────────────────────────────────────────────────────────┐
 │  📍 SECURITY SCOPE FOR THIS PROJECT PHASE                       │
