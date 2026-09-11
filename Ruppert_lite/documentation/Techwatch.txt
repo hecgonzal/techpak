@@ -1,0 +1,250 @@
+TECHWATCH PROJECT SCOPE
+=======================
+
+Status: Concept and hardware validation
+Project: Techpack / Technet
+Related systems: Ruppert-lite, PackService, TechOS (working name)
+
+
+1. PURPOSE
+----------
+
+Techwatch is a low-power, wearable Technet endpoint. It provides a
+glanceable user interface, collects personal and device telemetry, and
+acts as a trusted control and notification surface for the wider Techpack
+network.
+
+The watch should be useful while disconnected from the rest of Technet and
+should synchronize buffered state and telemetry when a trusted connection is
+available. It is not intended to replace Ruppert-lite or a more capable host.
+Where local resources are insufficient, it should forward requests to a
+trusted Ruppert-lite device and clearly indicate that delegation to the user.
+
+
+2. PRIMARY GOALS
+---------------
+
+### Technet integration
+
+- Discover nearby Techpack devices and display their availability.
+- Enroll as a new Techpack member through an administrator-approved,
+    physically confirmed setup flow.
+- Maintain a persistent device identity and report capabilities, health, and
+    service status.
+- Send authorized commands to other devices through the Technet message bus.
+- Receive device state, alerts, and responses from Technet.
+- Communicate with Ruppert-lite through a lightweight watch client or a
+    delegated request interface on a more capable device.
+- Provide a visible indication of connection state, synchronization state,
+    and whether a response was produced locally or remotely.
+
+### Notifications and user interaction
+
+- Display prioritized notifications, alerts, and command results.
+- Support acknowledge, dismiss, snooze, and retry actions.
+- Preserve a small local notification history when disconnected.
+- Provide configurable vibration, sound, and display behavior where hardware
+    supports it.
+- Provide an emergency or high-priority alert action with explicit confirmation
+    for actions that could affect other devices or expose personal data.
+
+### Health and activity monitoring
+
+Collect, timestamp, and report supported measurements. Sensor availability
+must be capability-driven; unsupported measurements must be reported as
+unavailable rather than represented as false values.
+
+- Heart rate and heart-rate trends.
+- Step count and general activity.
+- Motion, orientation, and stationary/activity state.
+- Sleep and rest periods, where the available sensors and battery permit it.
+- Skin or ambient temperature, clearly labeled by sensor source.
+- Blood oxygen, only if a suitable sensor is present and validated.
+- Optional health-related derived metrics such as hydration reminders,
+    activity goals, and estimated energy expenditure.
+- Sensor quality, calibration state, sampling interval, and sensor errors.
+
+Techwatch must present health information as measurements and trends, not as
+medical diagnoses.
+
+### Watch interface
+
+- Provide a watch-specific UI integrated with TechOS (name to be finalized).
+- Provide a glanceable home screen with time, battery, connection state, and
+    selected health or system metrics.
+- Provide screens for notifications, health, connected devices, commands,
+    settings, and diagnostics.
+- Support touch input, display sleep/wake, and an interaction model suitable
+    for a small screen.
+- Keep core screens usable in low-power mode and when Technet is unavailable.
+- Include accessibility settings such as text size, contrast, haptic feedback,
+    and reduced-motion behavior where supported.
+
+
+3. OFFLINE AND RELIABILITY REQUIREMENTS
+---------------------------------------
+
+- Continue collecting local telemetry without a network connection.
+- Buffer telemetry and event records locally until synchronization is possible.
+- Mark records with timestamps, source, quality, and synchronization state.
+- Queue safe, user-approved commands for later delivery only when explicitly
+    requested; do not silently replay sensitive commands.
+- Recover cleanly after power loss, reset, or an interrupted synchronization.
+- Provide low-power, normal, and emergency power modes.
+- Warn before battery exhaustion and preserve critical logs during shutdown.
+- Expose degraded state when a sensor, service, storage area, or connection is
+    unavailable.
+- Use a watchdog or equivalent recovery mechanism for stalled services.
+
+
+4. SECURITY AND PRIVACY REQUIREMENTS
+------------------------------------
+
+- Use device enrollment and identity verification before normal participation
+    in Technet.
+- Keep private identity keys on the watch and never transmit them.
+- Use authenticated, encrypted connections for trusted device communication.
+- Enforce capability-based permissions for commands, configuration, health
+    data, and enrollment operations.
+- Require local confirmation for high-risk commands and new-device enrollment.
+- Reject replayed, malformed, unauthorized, or unverifiable commands.
+- Protect health, location, behavior, and notification data from unnecessary
+    synchronization.
+- Provide lock, disconnect, revoke, and recovery behavior for a lost or stolen
+    watch.
+- Record security-relevant events such as enrollment, failed authentication,
+    rejected commands, policy changes, and recovery actions.
+
+
+5. TELEMETRY AND DATA MODEL
+---------------------------
+
+Each record should include, where applicable:
+
+- Schema version.
+- Event or measurement timestamp and device clock status.
+- Persistent device ID and user-facing alias.
+- Data source and sensor identifier.
+- Measurement value, unit, and sampling interval.
+- Quality, confidence, calibration state, or degradation flags.
+- Local sequence number and synchronization status.
+- Privacy classification and retention policy.
+
+The watch should expose the following logical data groups:
+
+- Device identity and capabilities.
+- Battery, charging, power mode, and estimated remaining time.
+- Thermal state and internal temperature sensors.
+- Runtime state, uptime, boot or reset reason, and firmware version.
+- Network discovery, connection, heartbeat, and synchronization state.
+- Health and activity measurements.
+- Notifications, commands, acknowledgements, and audit events.
+- Storage usage, queue depth, and service health.
+
+
+6. HARDWARE BASELINE
+--------------------
+
+Initial target: LilyGo T-Display-S3 Touch version.
+
+- ESP32-S3 display and microcontroller platform.
+- Wi-Fi and Bluetooth connectivity.
+- 1.9-inch touchscreen display.
+- 16 MB flash.
+- 8 MB RAM.
+- 3.3 V power supply.
+- Arduino IDE and MicroPython development options.
+
+Prototype battery: 
+Ultra-Thin LiPo Battery LP284362 3.7V 800mAh
+LP284362 3.7V@800mAh 2.96Wh
+with Protection Circuit & Wires AWG26
+
+Dimension: 3,2 x 43 x 63mm
+
+Hardware-specific goals:
+
+- Identify the exact display, touch controller, battery, charging circuit,
+    sensors, and available GPIO interfaces before implementation is finalized.
+- Define a capability manifest so software can adapt to optional sensors and
+    hardware revisions.
+- Measure realistic battery life for display-on, idle, disconnected, and
+    sensor-intensive workloads.
+- Reserve storage for firmware, configuration, buffered telemetry, logs, and
+    recovery data.
+- Keep the first implementation within the memory and flash limits of the
+    target board.
+
+
+7. SYSTEM SERVICES AND INTEGRATION POINTS
+-----------------------------------------
+
+The watch should integrate with the existing service model where practical:
+
+- `tp-netlink`: discovery, device presence, heartbeat, and capabilities.
+- `tp-msgbus`: commands, responses, notifications, and telemetry transport.
+- `tp-authlite`: identity, enrollment, session tokens, and permissions.
+- `tp-packboard`: wearable and environmental sensor ingestion.
+- `tp-healthstats`: health trends and derived activity metrics.
+- `tp-syncd`: selective synchronization and offline queue handling.
+- `tp-ruppertlog`: local and distributed event logging.
+- `tp-configd`: device profile, power mode, and policy state.
+- `tp-notify`: notification routing and presentation rules.
+- `tp-updater`: signed application or service updates where supported.
+
+The watch must remain functional if any nonessential service is unavailable.
+
+
+8. INITIAL DELIVERY PHASES
+--------------------------
+
+### Phase 1: Hardware and local prototype
+
+- Boot, display, touch input, timekeeping, battery reporting, and basic power
+    states.
+- Local UI shell and diagnostic screen.
+- Hardware capability detection.
+
+### Phase 2: Technet endpoint
+
+- Discovery, enrollment, authenticated connection, heartbeat, and device
+    status reporting.
+- Notification receipt and basic command request/response flow.
+
+### Phase 3: Telemetry and offline operation
+
+- Sensor ingestion, timestamped local storage, buffering, synchronization,
+    quality flags, and health/activity views.
+
+### Phase 4: Hardening and maintenance
+
+- Recovery behavior, audit events, lock/revocation flows, power profiling,
+    update delivery, retention controls, and broader hardware validation.
+
+
+9. OUT OF SCOPE FOR THE FIRST PROTOTYPE
+---------------------------------------
+
+- Medical diagnosis or clinical monitoring.
+- Fully independent AI inference on the watch.
+- Unattended execution of high-risk remote commands.
+- Continuous high-rate sensing without a measured battery and storage budget.
+- Cloud dependency for core operation.
+- Support for every possible watch sensor before the baseline hardware is
+    validated.
+
+
+10. OPEN DESIGN DECISIONS
+-------------------------
+
+- Final operating environment: MicroPython, Arduino-based firmware, or a
+    dedicated lightweight runtime.
+- Whether Bluetooth is used for provisioning, primary transport, or both.
+- Exact sensors available on the selected board and any external sensor board.
+- Local data retention duration and health-data synchronization policy.
+- Authentication and local unlock mechanism.
+- Notification priority rules and emergency behavior.
+- Final TechOS name and UI toolkit.
+- Whether boot-device enrollment is performed directly by the watch or by a
+    host-assisted setup flow.
+    

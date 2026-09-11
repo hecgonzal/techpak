@@ -1,305 +1,600 @@
 ╔════════════════════════════════════════════════════════════════╗
-║          🔒 SECURITY ARCHITECTURE 🔒                          ║
+║             🔒 TECHPACK SECURITY ARCHITECTURE 🔒              ║
 ╚════════════════════════════════════════════════════════════════╝
 
-Techpack is designed as a resilient local mesh of devices operating in a compact wearable or backpack environment. Security must protect network trust, command execution, file sync, and device identity without forcing heavy infrastructure or centralized authority. The design must remain suitable for low-power devices, temporary devices, and mixed device classes.
+Techpack is a resilient local mesh for inventory, health, environmental monitoring, logging, and device control. Security must protect identity, commands, synchronization, and sensitive data while remaining suitable for low-power Arch-based x86 and ARM devices.
+
+This document records the current security decisions. It is an implementation guide, not a claim that a custom operating system or packet format is secure by itself.
 
 ┌─────────────────────────────────────────────────────────────┐
-│  🎯 SECURITY GOALS                                              │
+│  🎯 SECURITY GOALS                                           │
 └─────────────────────────────────────────────────────────────┘
 
-The security model must satisfy the following:
+- Prevent device impersonation and unauthorized enrollment.
+- Prevent unauthorized commands, configuration changes, and updates.
+- Detect packet tampering, replay, routing manipulation, and session hijacking.
+- Protect health, location, conversation, log, and behavior data.
+- Keep security functional when the network is offline or the VPN is unavailable.
+- Make authority explicit, auditable, revocable, and distributed at enforcement time.
+- Keep the service implementation lightweight and local-first.
 
-- Protect device identity against spoofing or impersonation
-- Prevent unauthorized command execution across the mesh
-- Restrict device administration to trusted authority layers
-- Allow manual onboarding for new devices without hard-coded universal trust
-- Ensure command replay and credential reuse are detectable
-- Preserve local operation when a device loses network connectivity
-- Keep implementation lightweight enough for Arch-based x86 and ARM devices
+Security invariant:
+
+No network-received data is trusted merely because it was parsed successfully, arrived over TLS, came from a known device, or matches a known schema. Authorization must succeed before security-sensitive actions are executed.
 
 ┌─────────────────────────────────────────────────────────────┐
-│  ⚙️  CORE PRINCIPLES                                            │
+│  ⚙️  AUTHORITY BOUNDARIES                                    │
 └─────────────────────────────────────────────────────────────┘
 
-The security model is intentionally layered and follows these rules:
+TechNetAdmin is a combined authority role, implemented initially by two services:
 
-- PackService: No authority- collects information, emits packets, must request permissions. These are the project tools.
-- TechNet is responsible for packet creation, transport, and network discovery. The way the tools communicate.
-    - MsgBus is a transport envelope only. It exposes only the headers required to route a packet.
-- TechNetAdmin is the only authority layer for identity, permissions, verification, and admin actions. Permission for tools to operate.
-    - Authorization is separated from payload content.
-    - Device permissions are restricted
+- `tp-authlite` owns device identity, enrollment verification, certificates, session tokens, key rotation, and revocation checks.
+- `tp-configd` owns signed policy distribution and policy state.
+- Together they provide the authority function. No separate authority service is required initially.
+- `tp-msgbus` routes messages and exposes only transport headers. It does not authorize them.
+- `tp-netlink` provides discovery, heartbeat, and route information. Network presence is not proof of trust.
+- PackService tools collect data and request actions. They have no authority to grant themselves permissions.
+- Every receiving device enforces authorization locally and may impose stricter local restrictions than the host policy.
 
-
+The host is the ongoing local root authority. An external admin device physically bootstraps the host and may be required for recovery or high-risk approval.
 
 ┌─────────────────────────────────────────────────────────────┐
-│  ⚠️  THREAT MODEL                                               │
+│  ⚠️  THREAT MODEL                                            │
 └─────────────────────────────────────────────────────────────┘
 
-    System is susceptible at basically every level. Custom OS+Unique Packet design make hacking possible with adequete
-    effort/system understanding. I've identified all the risk vectors below, though by no means is this an exaughstive list
+The system is susceptible at every layer. A custom OS and unique packet design may be attacked by anyone with enough effort and system understanding. This list is intentionally broad and is not exhaustive.
 
-        Packet: 
-            Malicious commands
-            Payload tampering
-            Replay attacks
-            Impersonation
-            Routing manipulation for tp_netlink
-            Packet flooding
-        Device: 
-            Comprimised device ownership
-            Unauthorized device connection
-        Network: 
-            Man in the middle
-            Session hijacking
-            Broadcast packets reveal total network size+capabilities
-        Internet: 
-            Cloud API's utilized by devices can return malicious data/inject data
-            Malicious updates
-            Remote Command injection (a cool feature if I can do it, a pretty lame one if everyone can)
-        Data:
-            Health metrics
-            Location data
-            Log+conversation leakage
-            Behavior profile (stuff we dont want advertisors buying)
-        Config:
-            Device policy alteration
-        syncd
-            State corruption
-            File injection
-        Physical
-            USB injection
-            Sensor spoofing
-            A stolen device
-    
+Packet:
+- Malicious commands
+- Payload tampering
+- Replay attacks
+- Impersonation
+- Routing manipulation for `tp-netlink`
+- Packet flooding
 
-This model is intentionally aimed at local-device compromise, impersonation, replay, and unauthorized command execution, not full internet-scale adversary modeling. Ideally, the network will be segregated enough by a VPN running on the BrainBoard that is monitoring traffic
+Device:
+- Compromised device ownership
+- Unauthorized device connection
+- Stolen or physically accessed device
+
+Network:
+- Man-in-the-middle attacks
+- Session hijacking
+- Broadcast traffic revealing network size or capabilities
+
+Internet and external services:
+- Cloud APIs returning or injecting malicious data
+- Malicious updates
+- Remote command injection
+
+Data and configuration:
+- Health metrics, location data, logs, conversations, and behavior profiles being exposed
+- Device policy alteration
+- State corruption or file injection through `tp-syncd`
+
+Physical layer:
+- USB injection
+- Sensor spoofing
+- Direct access to storage or hardware
+
+The first implementation focuses on local compromise, impersonation, replay, unauthorized commands, malicious updates, and unauthorized enrollment. A BrainBoard VPN is useful for isolation and monitoring, but it is defense-in-depth and never replaces TLS or authorization.
 
 ┌─────────────────────────────────────────────────────────────┐
-│  👤 IDENTITY MODEL                                              │
+│  👤 IDENTITY AND TRUST                                      │
 └─────────────────────────────────────────────────────────────┘
 
-Each device must carry a stable device identity, distinct from user-facing aliases.
+Each device has separate identity concepts:
 
-- A device has a persistent self ID generated during registration or first secure onboarding
-- Device aliases are user-facing labels and may change in config
-- Device identity is for trust and accountability, not display
-- A device may also carry a temporary first-contact or mutual-trust identity for local mesh recognition
-- Temporary/unknown devices are generated an ID + an ID signifying low trust
--Devices will create a "fistbump" ID on first contact, meaning each device will have unique ID's for each other device to prevent device impersonation
-    -On detection, packets from potentially corrupt device will be stored in logs on a segregated drive partition and Rupert+user will be notified
+- Persistent device ID: stable registry identity used for accountability. It is not the user-facing alias.
+- Device alias: display label that may change in configuration.
+- Ed25519 identity keypair: generated on the device. The private key never leaves the device; the host stores the approved public key or fingerprint.
+- TLS certificate identity: used for mutual TLS channel authentication.
+- Fistbump record: peer-specific state showing that a relationship was previously established. It may be an additional local authorization condition, but it does not establish cryptographic identity or authority and cannot override certificate validation, revocation, or policy.
+- Temporary enrollment identity: used only during first contact and destroyed after enrollment.
 
-This supports both durable identity and temporary peer trust without conflating the two concepts.
+During normal operation, mutual TLS proves possession of the private key associated with the enrolled certificate. The host maps the verified certificate fingerprint to the registry record before accepting the device identity. An application-layer Ed25519 challenge is reserved for enrollment, key rotation, recovery, or another explicitly defined need for proof independent of TLS.
+
+If an identity mismatch or suspected corruption is detected, the packet is not executed. The full packet is quarantined on the segregated security partition and the user/admin is notified.
 
 ┌─────────────────────────────────────────────────────────────┐
-│  🤝 FIRST-CONTACT ONBOARDING                                    │
+│  🤝 DEVICE ENROLLMENT FLOW                                  │
 └─────────────────────────────────────────────────────────────┘
 
-First contact between two devices cannot be assumed safe by default. A network participant must prove identity before it is trusted.
+Unregistered devices use a limited setup/enrollment network. Network presence alone never grants normal access.
 
-Techpack supports multiple bootstrap methods depending on the device type:
+1. The device generates its Ed25519 keypair locally and sends an enrollment request containing its proposed name, device type, public key, and temporary session ID.
+2. The host `TechnetDevices` enrollment function records the pending request and asks the administrator to approve that specific public key and session.
+3. The host opens a single-use enrollment session lasting 5 minutes. It is bound to the device public key and temporary session ID.
+4. The device provides physical confirmation. The confirmation signal is valid for 60 seconds within the enrollment session. Devices without a practical button may use a host-assisted hardware connection.
+5. The host sends a unique cryptographic challenge.
+6. The device signs the challenge with its private key and returns the signature. The private key is never transmitted.
+7. The host verifies the signature against the originally approved public key.
+8. On success, the host creates the persistent device registry record, assigns policy, and issues the initial credentials.
+9. The enrollment session, challenge, and temporary credentials are destroyed immediately. Timeout, cancellation, failed confirmation, wrong key, or failed signature invalidates the pending session.
 
-- High-capability devices: factory-provisioned credentials or administrator-assisted onboarding
-- Low-capability devices: manual pairing, QR-based verification, or a secure local setup flow
-- Temporary guest devices: limited access only until explicit trust is granted
+Enrollment therefore requires three conditions:
 
-A device must not automatically trust another device simply because it is present on the same subnet or mesh.
+    Administrator approval
+             +
+    Physical device confirmation
+             +
+    Cryptographic proof of key ownership
+             =
+    Trusted device enrollment
 
 ┌─────────────────────────────────────────────────────────────┐
-│  🤜🤛 MUTUAL TRUST & FISTBUMP IDENTITY                          │
+│  🔐 CRYPTOGRAPHY AND TRANSPORT                              │
 └─────────────────────────────────────────────────────────────┘
 
-After a secure first contact, two devices may establish a mutual fistbump ID. This is a peer-specific trust record that is stored locally on both devices.
-
-The fistbump ID exists to support:
-
-- device-to-device trust recognition
-- replay detection
-- impersonation detection
-- local verification without a central registry
-
-This identity is not the same as a universal device ID and should not be treated as a global authority marker.
+- Ed25519 is used for persistent device identity and signatures.
+- TLS 1.3 with mutual TLS is used for encrypted, authenticated service connections.
+- The external admin device roots the host certificate authority. The host operates a local/subordinate CA for enrolled device certificates.
+- The root CA private key remains on the external admin device and is not routinely online. The host receives only the subordinate CA authority required to issue and revoke enrolled device certificates.
+- Python `ssl` provides the TLS interface. The `cryptography` package provides Ed25519 and certificate operations.
+- Private keys and trust data are protected by OS permissions and an encrypted volume. Hardware-backed storage may be used when available, but is not required for the first implementation.
+- VPN is optional defense-in-depth. TLS and application authorization remain mandatory when VPN is off.
 
 ┌─────────────────────────────────────────────────────────────┐
-│  📋 AUTHORIZATION MODEL                                         │
+│  📦 PACKET AND AUTHORIZATION LAYERS                         │
 └─────────────────────────────────────────────────────────────┘
 
-Authorization is intentionally separated from payload transit.
+Every message has three separate layers:
 
-A packet contains three layers:
+- MsgBus: source/destination routing headers, aliases, priority, and transport metadata only.
+- Authorization: identity proof, token, audience, permission claims, nonce, sequence, and signatures.
+- Payload: command, telemetry, state, or synchronization content.
 
-- MsgBus: routing only
-- Authorization: identity, trust, permission, and proof
-- Payload: command, telemetry, or state information
+The receiver must validate authorization before dispatching the payload. TLS protects the live connection, while application-level authentication is required only where the message risk or lifetime justifies it.
 
-This means a packet cannot be trusted just because it reached the right device. The receiving device must validate authorization before acting on the payload.
+Application-level Ed25519 signatures are required for commands, policy and revocation data, update artifacts, synchronization manifests, audit records, messages stored for later verification, and messages crossing an untrusted intermediary. Ordinary live telemetry may rely on mTLS, authorization, and the payload hash without an Ed25519 signature.
+
+When an application signature is required, the proof covers:
+
+- A canonical hash of the complete packet, including MsgBus, Authorization, and Payload layers.
+- A separate hash of the payload for independent payload-integrity checks.
+
+Both hashes are covered by the Ed25519 signature. Changing routing headers, authorization claims, or payload content invalidates the proof. The exact canonicalization rules belong in the packet schema.
 
 ┌─────────────────────────────────────────────────────────────┐
-│  🏆 PERMISSION TIERS                                            │
+│  🎫 TOKENS, REFRESH, AND PERMISSIONS                        │
 └─────────────────────────────────────────────────────────────┘
 
-Permission levels should be defined in the authorization layer and enforced at command execution time.
+After enrollment and successful mTLS authentication, `tp-authlite` evaluates the device, registry, policy, revocation state, and requested audience before issuing a host-signed authority token with a one-hour lifetime. Either side may request refresh through an authenticated mTLS session. A fresh challenge is not required for ordinary refresh; step-up proof remains required for high-risk actions.
 
-Suggested initial structure:
+The minimal signed token claims are:
 
-- Tier 1: administrative actions
-  - command execution
-  - updates
-  - device reconfiguration
-  - permission changes
-- Tier 2: logging and local state access
-  - log reads
-  - retention or sync actions
-  - telemetry export
-- Tier 3: network-level actions
-  - discovery
-  - heartbeat
-  - mesh presence
-  - route propagation
+- issuer
+- subject device ID
+- audience
+- capabilities
+- issued-at time
+- expiration time
+- unique token ID
 
-These tiers should be refined later, but the key rule is that higher-impact actions require stronger proof with lower network access being accessable without network permissions.
+The token is bound to the authenticated mTLS device and checked against the current registry and policy state. Request nonce, sequence, audience, and any required application signature are verified on the individual request.
+
+Tokens are audience-specific by default. Network-wide tokens are reserved for policy and revocation distribution. Ordinary commands cannot use a network-wide token.
+
+Permissions use a hybrid model:
+
+- Named capabilities provide broad access, such as `telemetry.read` or `config.write`.
+- Resource/action restrictions narrow that access to particular devices, services, or operations.
+- Tier 1 covers administration, updates, configuration, permission changes, and other high-impact actions.
+- Tier 2 covers logging, local state, synchronization, and telemetry export.
+- Tier 3 covers discovery, heartbeat, mesh presence, and route propagation.
+
+High-risk actions require step-up authentication in addition to a valid token. Updates require fresh cryptographic proof. Permission changes, reset, and other irreversible operations require physical or administrator confirmation.
+
+Key rotation:
+
+- A device may rotate its Ed25519 key and TLS certificate without changing its persistent device ID.
+- Rotation requires authenticated authorization from the current host authority.
+- The replacement public key and certificate fingerprint are approved as one registry update.
+- Physical or administrator confirmation is required when local policy treats rotation as a high-risk action.
+- The previous key and certificate are revoked after the replacement is verified.
 
 ┌─────────────────────────────────────────────────────────────┐
-│  👑 ADMIN AUTHORITY                                             │
+│  🔁 REPLAY, TIME, AND OFFLINE OPERATION                     │
 └─────────────────────────────────────────────────────────────┘
 
-A device may only act with authority when it can prove it is authorized by the local admin model.
+Each sender maintains persistent per-peer sequence counters. Each request also carries a unique nonce. Receivers retain recent nonces through the token or lease lifetime.
 
-The admin authority layer must support:
+- Sequence rollback, duplicate nonce, altered packet, or invalid signature causes rejection and full packet quarantine.
+- Counter persistence failure blocks sending and accepting commands until the counter state is recovered.
+- Explicitly idempotent commands may retry using a new authorized request. Non-idempotent duplicates remain rejected.
+- Token and offline lease expiration use wall-clock time with a provisional one-hour skew tolerance.
+- The one-hour skew is a temporary operational choice and should be tightened after clock behavior is measured.
 
-- manual user proof for administrative actions, intially performed by external trusted device
-- device-level permission checks
-- temporary or delegated action approval
-- secure rejoin or recovery of a lost device
-- protection against stolen or replayed admin commands
+Offline devices may use a separately bounded lease of up to 72 hours. The offline allowlist is explicit:
 
-The admin proof should be scoped to specific actions and should not be treated as a permanent universal grant.
+- Telemetry collection: permitted.
+- Local logging and inspection: permitted.
+- Synchronization: limited to locally queued, policy-approved data; remote policy or executable changes are not permitted.
+- Routine local control: permitted only for commands explicitly marked low-risk by policy.
+- Configuration or policy changes: not permitted.
+- Permission changes: not permitted.
+- Updates: not permitted.
+- Remote administration: not permitted.
+
+After reconnecting, a device must fully revalidate its identity proof, token, policy epoch, and revocation state before it resumes commands.
 
 ┌─────────────────────────────────────────────────────────────┐
-│  🎫 SESSION TOKEN MODEL                                         │
+│  🌐 DISCOVERY AND NETWORK PRIVACY                           │
 └─────────────────────────────────────────────────────────────┘
 
-Session tokens are required for transient trust windows, especially where commands are issued across the mesh.
+Untrusted discovery reveals minimal presence only. It does not reveal member device IDs, capabilities, or detailed routes.
 
-Session tokens should include:
-
-- device identity
-- session scope
-- expiration window (shorter means more commands processing)
-- usage restrictions
-- proof of issuance by an authorized layer
-
-Tokens should not be accepted permanently. They should be short-lived and audited.
+Authenticated enrolled peers may receive signed discovery responses containing approved identity, capability, and route details. Discovery must be rate-limited and must not be treated as authorization.
 
 ┌─────────────────────────────────────────────────────────────┐
-│  ⏰ TIME-BASED COORDINATION                                      │
+│  🛡️ POLICY, REVOCATION, AND RECOVERY                        │
 └─────────────────────────────────────────────────────────────┘
 
-The ecosystem may optionally use a shared internal network calendar to mantain a consistent internal ecosystem and operate as another sign of devices intruding on network
+The host signs policy. Each device stores and enforces the policy locally and may apply stricter local restrictions.
 
-This feature is useful only if:
+Revocation uses both:
 
-- clocks are reasonably synchronized (perhaps only kept up to the day, maybe hour)
-- skew tolerances are defined
-- replay windows are bounded
-- fallback behavior is specified for drift
+- A signed revocation list for identity-level blocking.
+- A policy/revocation epoch for fast invalidation of stale authorization state.
+- Immediate peer-local blocking when a device detects active compromise.
 
-This should be treated as an optional security enhancement, not the foundation of the entire trust model.
+The authoritative registry retains device ID, public-key fingerprints, certificate fingerprint, device type, permissions, enrollment state, policy version, revocation state, and timestamps. It also retains pending enrollment state until success, timeout, cancellation, or failure.
+
+Recovery uses a user-held recovery secret. A reset device reconnects through the enrollment/recovery process and receives fresh local state from the current host authority. Potentially compromised local state is not restored automatically.
+
+Key rotation and certificate replacement are distinct from device recovery. Recovery may replace credentials and local state, but the persistent device ID remains unchanged only when the current authority can verify continuity; otherwise the device must complete fresh enrollment.
 
 ┌─────────────────────────────────────────────────────────────┐
-│  🔐 ENCRYPTION & KEY HANDLING                                   │
+│  📥 UPDATES, SYNC, AND DATA PROTECTION                      │
 └─────────────────────────────────────────────────────────────┘
 
-Private keys and sensitive trust data must be stored in encrypted local storage. At minimum:
+`tp-updater` and `tp-syncd` require signed artifacts and manifests plus explicit policy authorization.
 
-- private keys must never be stored in plaintext
-- device registration data must be protected
-- authorization material must be isolated from payload logs
-- admin proof material must not be exposed in ordinary telemetry
-
-Encryption strategy should be lightweight and local-first, with the emphasis on device-local security rather than heavy central key infrastructure.
+- Accepted versions must be monotonic to prevent rollback.
+- Updates require trusted signatures and administrator approval.
+- Synchronization data must be checked against its signed manifest before it changes local state.
+- After recovery, only artifacts signed by the current host authority are accepted.
+- Security logs and authorization material remain isolated from ordinary telemetry and payload logs.
 
 ┌─────────────────────────────────────────────────────────────┐
-│  🔄 RECOVERY & LOCKOUT                                          │
+│  📊 LOGGING AND INCIDENT RESPONSE                            │
 └─────────────────────────────────────────────────────────────┘
 
-The system must define recovery behavior for:
+The authorization layer records enrollment, failed permission checks, invalid signatures, replay attempts, token expiration, revocation, recovery, lockout, and admin actions.
 
-- lost or stolen devices
-- device re-registration
-- compromised peer devices
-- offline device rejoin
-- admin lockout scenarios
-
-A recovery path should exist without requiring a universal network key. Recovery must be explicit, auditable, and permission-scoped.
+Suspicious packets are quarantined in full on the segregated partition and are never executed. The user and administrator are notified according to local policy. Quarantine storage must be access-controlled and protected from ordinary service writes.
 
 ┌─────────────────────────────────────────────────────────────┐
-│  📊 SECURITY LOGGING & AUDIT                                    │
+│  📍 IMPLEMENTATION SCOPE                                     │
 └─────────────────────────────────────────────────────────────┘
 
-Security events should be logged at the authorization layer:
+Required for the first security implementation:
 
-- new device trust establishment
-- failed permission checks
-- replay/reuse detection
-- token expiration
-- admin command attempts
-- device recovery and lockout actions
+- Ed25519 device identity and enrollment challenge-response
+- Host-rooted enrollment with physical confirmation
+- mTLS 1.3 transport
+- Host-signed, one-hour audience-specific tokens
+- Distributed signed policy enforcement
+- Per-peer sequence counters and nonce replay protection
+- Revocation list and policy/revocation epoch
+- 72-hour restricted offline lease
+- Conditional application signatures for security-sensitive or long-lived messages
+- Signed update and synchronization manifests
+- Key rotation without unnecessary device re-enrollment
+- Recovery, quarantine, and security audit logging
 
-Security logs should be separate from ordinary telemetry and should not be used as a general-purpose data store.
+Deferred until the protocol has real implementation and test evidence:
 
-┌─────────────────────────────────────────────────────────────┐
-│  ❓ OPEN DESIGN QUESTIONS                                        │
-└─────────────────────────────────────────────────────────────┘
+- Dynamic trust graph expansion
+- Complex federation between independent TechNets
+- Broad policy-engine generalization
+- Advanced time-derived key sequences
+- Universal network keys
 
-The following items must be decided before auth implementation begins:
+The next implementation step is to define the authorization packet schema, including canonicalization and signature-required message classes, followed by `tp-authlite`, registry storage, and `tp-configd` policy enforcement.
 
-- What is the exact first-contact bootstrap flow?
-    1) TechOS install from drive/external device
-    2) First time user set up (new technet) OR option to connect to local TechNet using password created by user on intial setup. This process is a manual add.
-    3) On successful connecct, additional devices are added through further additional adds while less intelligent devices  will connect to host device where the add key must then be entered.
-- Should auth be based on signed tokens, challenge-response, or a hybrid?
-    
-    Intial authority will be granted with a challenge response, on passing the device will be assigned an authoirty token with an expiration of 1 hour
+================================================================
+SHORT-TERM SECURITY IMPLEMENTATION PLAN
+================================================================
 
-- What is the trust lifetime for fistbump IDs?
+Purpose
 
-    For now, all trust will survive for one hour before requiring a refresh
+The short-term plan creates a secure, understandable MVP. It intentionally uses the smallest set of mechanisms that provide useful protection for an enrolled local device network:
 
-- What is the admin proof derivation model?
+    Enrollment
+        -> Device identity
+        -> TLS 1.3 mutual authentication
+        -> Host-signed authorization token
+        -> Local permission check
+        -> Payload execution
 
-    The hardest design question for security on this system.
+The MVP must not attempt to implement every long-term feature at once. Each feature below must have a small public interface so that stronger controls can be added later without rewriting PackService or MsgBus.
 
-- How is permission enforcement placed: centralized or distributed?
+MVP security boundary
 
-    Must be distrubuted 
+Required in the short term:
 
-- What is the recovery flow for a locked-out device?
+- Device-generated Ed25519 identity keypair.
+- Manual enrollment approved by the host and confirmed by a physical or host-assisted hardware action.
+- TLS 1.3 mutual authentication for normal device connections.
+- A host-signed, one-hour authorization token.
+- Local capability and resource/action permission checks on every receiving device.
+- Basic device revocation checked before a session or command is accepted.
+- Unique request IDs and nonces for commands.
+- Signed update manifests and administrator approval for executable updates.
+- OS permissions and encrypted storage for private keys and registry data.
+- Security-event logging without executing rejected requests.
 
-    Reset of device + reconnection to network followed by a fresh update of local data from network
-- What is the acceptable clock skew for any time-based security mechanism?
+Deferred from the MVP unless a real requirement appears:
 
-    1 hour until I have a good reason to suspect it isn't
+- Fistbump as an authorization condition.
+- Ed25519 signatures on ordinary live telemetry.
+- Persistent per-peer sequence counters.
+- A subordinate CA hierarchy rooted on an offline admin device.
+- General offline command leases.
+- Dynamic trust graphs and federated TechNets.
 
-┌─────────────────────────────────────────────────────────────┐
-│  📍 SECURITY SCOPE FOR THIS PROJECT PHASE                       │
-└─────────────────────────────────────────────────────────────┘
+MVP package composition
 
-For the current project phase, the following should be treated as required:
+Use Python 3 and keep the service layer small. The recommended external dependency is `cryptography` for Ed25519 operations and certificate handling. Use the Python standard library for JSON, file access, timestamps, locking, hashing, randomness, and process boundaries. Use Python `ssl` for TLS 1.3 sockets.
 
-- device identity
-- peer trust establishment
-- authorization separation from payload
-- layered permission model
-- admin proof flow
-- replay protection
-- encrypted local key material
+Do not implement cryptography manually. Do not use passwords as device identity. Do not use a device ID, alias, MAC address, or IP address as proof of identity.
 
-The following should be deferred until the trust model is finalized:
+Suggested package layout:
 
-- dynamic trust graph expansion
-- full policy engine
-- advanced revocation propagation
-- highly complex time-based key sequences
-- deep service-to-service federation
+    Technet/services/
+        tp_authlite/
+            __init__.py
+            identity.py       # key generation, public-key fingerprints
+            enrollment.py     # pending enrollment and approval state
+            certificates.py   # certificate creation and verification boundary
+            tokens.py          # host-signed token issue and verification
+            permissions.py    # capability and resource/action checks
+            revocation.py     # current revoked-device state
+            storage.py        # atomic protected local persistence
+            errors.py         # typed auth failures
+        tp_configd/
+            __init__.py
+            policy.py          # policy loading and validation
+            signing.py         # host policy signature boundary
+            evaluator.py       # local policy evaluation
+        tp_msgbus/
+            __init__.py        # routing envelope only
+            validation.py      # structure and size validation
+        tp_netlink/
+            discovery.py       # minimal presence discovery
+
+Keep cryptographic operations inside `tp_authlite`. Keep policy decisions inside `tp_configd`. Keep routing inside `tp_msgbus`. A service must call an authorization interface rather than import another service's private storage or silently bypass its checks.
+
+MVP interfaces
+
+Define stable interfaces before writing service-specific integrations:
+
+- `generate_identity()` returns a device keypair handle and public-key fingerprint. Private material is written only through protected storage.
+- `create_enrollment_request()` creates a temporary request bound to a public key, device type, and session ID.
+- `approve_enrollment()` approves one exact pending request, never a device type or arbitrary future request.
+- `complete_enrollment()` verifies physical confirmation, the unique challenge signature, and the approved public key before registering the device.
+- `issue_token()` accepts an authenticated device, requested audience, and policy decision, then returns a one-hour signed token.
+- `verify_token()` checks signature, issuer, subject, audience, expiry, revocation, and policy state.
+- `authorize_request()` checks the token, capability, resource/action rule, nonce, and request structure before dispatch.
+- `revoke_device()` changes the local registry state and causes future sessions and commands to fail.
+- `validate_policy()` rejects malformed, unsigned, or unsupported policy before it replaces an active policy.
+
+The return values should distinguish at least: malformed request, unknown device, untrusted certificate, expired token, revoked device, missing capability, wrong audience, duplicate request, and internal storage failure. Callers must fail closed for all authorization errors.
+
+MVP enrollment sequence
+
+1. A device generates its Ed25519 keypair locally.
+2. It connects only to the limited enrollment network and submits its public key, device type, proposed alias, and temporary session ID.
+3. The host stores a pending request with a five-minute expiration.
+4. An administrator approves that exact public key and session.
+5. A physical button, GPIO event, or documented host-assisted hardware signal opens a 60-second confirmation window.
+6. The host sends a fresh challenge containing the enrollment session ID and an unpredictable nonce.
+7. The device signs the challenge. The host verifies the signature against the approved public key.
+8. The host assigns a persistent device ID, creates the certificate/trust record, and assigns the initial least-privilege policy.
+9. The pending request, challenge, and temporary credentials are consumed and deleted.
+
+MVP normal connection sequence
+
+1. The device connects using TLS 1.3 mutual authentication.
+2. The host verifies the certificate chain, certificate validity period, registry fingerprint, and revocation state.
+3. `tp-authlite` issues or refreshes a one-hour token through the authenticated TLS session.
+4. The sender submits a request with a token, destination/audience, unique request ID, nonce, command type, and payload.
+5. The receiving device verifies the token and evaluates local policy.
+6. The receiver rejects the request before invoking a service if any check fails.
+7. The receiver logs the decision and executes the payload only after authorization succeeds.
+
+MVP token format
+
+Keep the token claims minimal and versioned:
+
+    {
+      "token_version": 1,
+      "issuer": "host-device-id",
+      "subject": "requesting-device-id",
+      "audience": "target-service-or-device",
+      "capabilities": ["telemetry.read"],
+      "issued_at": "timestamp",
+      "expires_at": "timestamp",
+      "token_id": "unique-id",
+      "signature": "host-signature"
+    }
+
+The token is not a password and must not be accepted without verifying its signature. Keep token parsing, claim validation, and policy evaluation separate so future claims such as policy epoch or key ID can be added without changing the message router.
+
+MVP replay and failure handling
+
+- Every command carries a unique request ID and cryptographically random nonce.
+- A receiver keeps a bounded nonce cache for the token lifetime.
+- A duplicate request is rejected before dispatch. Only commands explicitly declared idempotent may be retried, and a retry still requires a new authorized request ID and nonce.
+- Invalid signatures, wrong audiences, expired tokens, revoked devices, malformed packets, and missing permissions are rejected and logged.
+- If protected state cannot be read or written, the service fails closed for commands rather than assuming the last authorization state is safe.
+- Oversized packets and unknown command types are rejected before expensive processing.
+- A service crash must not mark a request as authorized. Authorization state and audit events should be written atomically where practical.
+
+MVP offline behavior
+
+Do not begin with a general 72-hour offline command lease. Until that mechanism is implemented and tested, offline operation is limited to local telemetry collection and local logging. Routine local control may be added only through an explicit allowlist with a separate test for each command.
+
+The interface should reserve an `offline_policy` decision so a future lease can be added without changing command handlers. Offline mode must never permit policy changes, permission changes, updates, remote administration, or recovery-state restoration.
+
+MVP update and storage rules
+
+- `tp-updater` accepts only artifacts with a valid signed manifest, supported target, expected hash, monotonic version, and explicit administrator approval.
+- `tp-syncd` may queue policy-approved data, but it must not overwrite executable code, credentials, or policy through ordinary synchronization.
+- Private keys, certificates, registry state, and token-signing keys use restrictive OS ownership and permissions and live on an encrypted volume.
+- Security logs are separate from ordinary telemetry. Rejected packets are not executed; full quarantine storage can be added when its retention and access policy are defined.
+
+MVP tests before integration
+
+Test real service behavior rather than only mocked calls:
+
+- Enrollment succeeds only with the approved public key, valid session, physical confirmation, and valid signature.
+- Enrollment fails for wrong key, expired session, reused session, missing hardware confirmation, and altered challenge.
+- TLS rejects an unknown, expired, revoked, or mismatched certificate.
+- Token verification rejects altered claims, wrong issuer, wrong audience, expired tokens, and revoked subjects.
+- Permission checks reject missing capabilities and resource/action mismatches.
+- Duplicate nonces and request IDs are rejected before payload execution.
+- Malformed, oversized, and unknown command packets never reach service handlers.
+- Signed update manifests reject altered files and rollback versions.
+- Protected storage failures cause authorization to fail closed.
+
+================================================================
+LONG-TERM SECURITY IMPLEMENTATION PLAN
+================================================================
+
+The long-term plan adds security only when the MVP has test evidence and a concrete requirement. Each stage must preserve the short-term interfaces and introduce one new control at a time.
+
+Stage 1: Harden identity and certificate lifecycle
+
+- Move from a host-managed certificate root to an offline external-admin root CA with a host subordinate CA.
+- Keep the root CA private key on the external admin device and offline during normal operation.
+- Let the host issue and revoke device certificates without exposing the root key.
+- Add certificate renewal and Ed25519 key rotation without changing the persistent device ID.
+- Require continuity proof, administrator approval, or fresh enrollment when replacing a key after suspected compromise.
+- Add recovery rules for lost, stolen, expired, and duplicated certificates.
+
+Edge scenarios:
+
+- If the host subordinate CA is compromised, revoke the subordinate certificate from the external admin device and reissue it.
+- If a device loses its private key, do not restore the key from ordinary sync; re-enroll or perform an approved recovery.
+- If a certificate expires while offline, permit only local safe-mode behavior until renewal succeeds.
+- If two devices claim one persistent ID, quarantine the newer claim and require administrator resolution.
+
+Stage 2: Add distributed policy signing and revision control
+
+- Make `tp-configd` publish signed, versioned policy documents.
+- Store the accepted policy version and signing-key fingerprint locally on every device.
+- Require monotonic policy versions and reject unsigned, malformed, or downgraded policy.
+- Preserve local restrictions so a device may reduce its own permissions but cannot grant itself more access.
+- Add policy epochs to invalidate stale tokens after material policy changes.
+
+Policy composition:
+
+- `tp-authlite` answers whether the device and token are authentic.
+- `tp-configd` answers whether the requested capability and resource/action are allowed.
+- The receiving service applies local safety restrictions and validates command-specific arguments.
+- `tp-msgbus` never makes the final permission decision.
+
+Stage 3: Add revocation distribution and offline leases
+
+- Publish signed revocation data from the host.
+- Use a revocation epoch for fast invalidation and retain a signed list for identity-level decisions.
+- Allow immediate peer-local blocking when active compromise is detected.
+- Introduce a bounded offline lease only after defining its issuer, maximum duration, capabilities, storage, and reconnect behavior.
+- Start with telemetry, local logging, and explicitly listed routine controls. Keep configuration, updates, permissions, administration, and recovery blocked offline.
+- Require full identity, token, policy, and revocation validation after reconnect before resuming commands.
+
+Edge scenarios:
+
+- A device that missed a revocation update must not receive a long offline lease without a current revocation snapshot.
+- If the clock is unreliable, the device enters restricted local mode rather than extending a lease indefinitely.
+- If revocation state cannot be persisted, remote commands fail closed.
+- If the host is unreachable for longer than the lease, only local telemetry and logging continue.
+
+Stage 4: Add selective application-level signatures
+
+Application signatures are not required for every live telemetry message. Add them when data must remain verifiable outside its original TLS connection.
+
+Require signatures for:
+
+- Commands crossing an untrusted intermediary.
+- Policy and revocation documents.
+- Update artifacts and synchronization manifests.
+- Audit records that must be independently verified.
+- Messages stored for later use or forwarded after the TLS session ends.
+
+Ordinary live telemetry may use mTLS, authorization, and integrity checks without an Ed25519 signature. The signature profile must state which fields are covered and use deterministic canonicalization. Do not create multiple signature formats for the same message class.
+
+Stage 5: Define Fistbump as supplemental peer state
+
+Fistbump must remain a small, optional relationship record rather than a second identity system. It may record the last approved relationship, peer-specific settings, or an additional local trust requirement.
+
+- Fistbump cannot establish identity.
+- Fistbump cannot override certificate validation, revocation, token verification, or policy.
+- Deleting Fistbump state must not delete the device registry identity.
+- Recreating Fistbump state requires the normal authorization path.
+
+Stage 6: Protect discovery, synchronization, and update workflows
+
+- Untrusted discovery reveals minimal presence only.
+- Authenticated peers may receive signed identity, capability, and route details.
+- Rate-limit discovery and enrollment requests per source and time window.
+- Require signed manifests for synchronization and reject files outside the approved path and type allowlist.
+- Require signed update metadata, artifact hashes, supported versions, administrator approval, and rollback protection.
+- Stage updates, verify them before installation, keep the previous known-good version, and define an administrator-approved rollback path.
+
+Stage 7: Improve audit and incident response
+
+- Add append-only or tamper-evident security logs when the storage model is defined.
+- Separate security-event access from ordinary application logging permissions.
+- Add retention limits so quarantine cannot exhaust the device partition.
+- Record packet hash, sender identity, destination, failure reason, token ID, request ID, and timestamp without exposing sensitive payloads unnecessarily.
+- Permit full packet quarantine only under an explicit policy and storage budget.
+- Add administrator notification throttling so packet flooding cannot become notification flooding.
+
+Stage 8: Recovery and authority continuity
+
+- Store a user-held recovery secret outside ordinary device synchronization.
+- Define how a replacement host is authorized by the external admin device.
+- Restore signed policy and registry state only after validating its origin, version, and integrity.
+- Never restore compromised credentials or executable state automatically.
+- Require fresh device validation after a host replacement.
+- Document the difference between credential replacement, device recovery, and fresh enrollment.
+
+Long-term service composition
+
+The mature service boundaries should remain:
+
+- `tp-authlite`: identity keys, certificates, enrollment, tokens, revocation, rotation, and authentication errors.
+- `tp-configd`: signed policy, capability definitions, resource/action restrictions, epochs, and local policy evaluation.
+- `tp-msgbus`: routing, size limits, transport metadata, and dispatch handoff; no authority decisions.
+- `tp-netlink`: discovery, heartbeat, route data, and privacy controls; no implicit trust.
+- `tp-updater`: signed update verification, version policy, staging, restart, and rollback.
+- `tp-syncd`: signed manifest verification, path/type restrictions, conflict handling, and safe data staging.
+- `tp-ruppertlog`: security-event storage with access controls and retention policy.
+- PackService modules: data collection and command execution only after authorization has succeeded.
+
+Long-term AI implementation rules
+
+When using AI to implement these services, require each change to identify:
+
+1. Which service owns the behavior.
+2. Which identity, token, policy, or signature is being checked.
+3. What happens when storage, clocks, certificates, or the network fail.
+4. Whether the request is rejected before payload execution.
+5. Which test proves the failure path and the successful path.
+
+AI-generated code must not invent new cryptographic formats, silently broaden permissions, bypass `authorize_request()`, or treat a parsed packet as trusted. Every security-sensitive change should include a narrow test, a malformed-input test, and a fail-closed test.
+
+Long-term completion criteria
+
+The security architecture is ready for production consideration only when:
+
+- Enrollment, authentication, authorization, revocation, recovery, and key rotation have documented state transitions.
+- Every security-sensitive service has explicit authorization checks before execution.
+- Packet schemas and canonicalization rules are versioned and tested.
+- Offline behavior is an allowlist rather than a vague command category.
+- Update and synchronization paths verify signatures before changing state.
+- Compromise, clock drift, disk failure, certificate expiry, host replacement, and network partition have tested behavior.
+- The system has a documented threat model, dependency inventory, key backup policy, and operational recovery procedure.
