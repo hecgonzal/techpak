@@ -12,9 +12,9 @@ def get_services_info():
 		"tp_sysinfo": "unknown",
 		"tp_netlink": "unknown",
 		"tp_msgbus": "unknown",
-		"tp_authlite": "unknown",
+		"tp_authlite": "in_process_prototype",
 		"degraded": True,
-		"degradation_flags": ["service_discovery_todo"],
+		"degradation_flags": ["service_discovery_todo", "authlite_transport_todo"],
 	}
 
 

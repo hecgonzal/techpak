@@ -1,2 +1,2 @@
 
-from logger import LoggingTools
+from .logger import LoggingTools

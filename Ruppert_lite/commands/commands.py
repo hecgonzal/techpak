@@ -1,6 +1,6 @@
 from src.logger import LoggingTools
 from config import ShellConfig
-from adapters import load_adapter
+import json
 
 
 class RuppertCommands:
@@ -27,6 +27,10 @@ class RuppertCommands:
                 "handler": self.cmd_help,
                 "description": "Show AI-generated help for all commands.",
             },
+            "condense": {
+                "handler": self.cmd_condense,
+                "description": "Manually use the configured maintenance model to index master-log records into the working log; run during idle time.",
+            },
         }
 
     def handle_command(self, input_command: str):
@@ -47,21 +51,49 @@ class RuppertCommands:
         print("Goodbye!")
         raise SystemExit
 
-    def cmd_help(self, args):
-        mode = args[0] if args else "short and simple"
+    def cmd_config(self, args):
+        if args:
+            print("Usage: /config")
+            return
+        print(json.dumps(self.shell_config.to_dict(), ensure_ascii=False, indent=2))
 
-        command_list = "\n".join(
-            f"- /{name}: {meta['description']}"
-            for name, meta in self.commands.items()
+    def cmd_set(self, args):
+        if len(args) < 2:
+            print("Usage: /set <key> <value>")
+            return
+        key, value = args[0], " ".join(args[1:])
+        allowed = self.shell_config.to_dict()
+        if key not in allowed:
+            print(f"Unknown or protected configuration key: {key}")
+            return
+        try:
+            parsed_value = json.loads(value)
+        except json.JSONDecodeError:
+            parsed_value = value
+        setattr(self.shell_config, key, parsed_value)
+        print(f"Updated {key} for this shell session only.")
+
+    def cmd_condense(self, args):
+        if len(args) > 1:
+            print("Usage: /condense [maximum records]")
+            return
+        try:
+            limit = int(args[0]) if args else 100
+            report = self.logging_tools.condense_master_log(max_records=limit)
+        except (OSError, TypeError, ValueError) as error:
+            print(f"Condensation could not start: {error}")
+            return
+        print(
+            "Working-log condensation complete: "
+            f"processed={report['processed']}, skipped={report['skipped']}, "
+            f"failed={report['failed']}, adapter={report['model']}"
         )
+        for failure in report["failures"][:5]:
+            print(f"- {failure['source_record_id']}: {failure['error']}")
 
-        # TODO: pull recent context from logs
-        context = ""
-
-        call = self.build_help_prompt(command_list, context, mode)
-
-        adapter_output = self.adapter.generate(call)
-        entry = self.logging_tools.build_entry(adapter_output)
-        self.logging_tools.append(entry)
-
-        print(adapter_output["response"])
+    def cmd_help(self, args):
+        if args:
+            print("Usage: /help")
+            return
+        for name, metadata in self.commands.items():
+            print(f"/{name}: {metadata['description']}")

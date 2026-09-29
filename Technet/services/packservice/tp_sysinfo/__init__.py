@@ -8,7 +8,9 @@ from .power import get_power_info
 from .runtime import get_runtime_info
 from .capabilities import get_capabilities_info
 from .services import get_services_info
+from ..tp_ruppertlog import service_logged
 
+@service_logged("tp-sysinfo")
 def get_sysinfo():
     return {
         "schema_version": "1.0",

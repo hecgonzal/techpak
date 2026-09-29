@@ -175,6 +175,9 @@ Hardware-specific goals:
 - Keep the first implementation within the memory and flash limits of the
     target board.
 
+Li-Pro Charging Module: MCP73831
+-lighter than alternative options
+
 
 7. SYSTEM SERVICES AND INTEGRATION POINTS
 -----------------------------------------

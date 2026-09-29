@@ -1,10 +1,10 @@
-"""Session token field for tp-netlink.
+"""Deprecated compatibility stub; session tokens belong to tp-authlite.
 
-TODO: this should eventually be issued by tp-authlite or a session manager.
-For now it remains empty until a real session exists.
+This value is not included in the Netlink route packet. Do not use this helper
+for authentication or authorization.
 """
 
 
 def get_session_token():
-    """Return the current session token for this device."""
+    """Return an empty legacy placeholder; no Netlink token is defined."""
     return ""

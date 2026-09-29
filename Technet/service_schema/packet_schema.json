@@ -1,0 +1,150 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://techpack.local/schemas/packet-v1.json",
+  "title": "Techpack Authlite Packet v1",
+  "description": "Structural contract for authenticated typed requests and correlated responses. Runtime Authlite validation is authoritative; route data is deliberately outside the signed content.",
+  "oneOf": [
+    { "$ref": "#/$defs/request" },
+    { "$ref": "#/$defs/response" }
+  ],
+  "$defs": {
+    "identifier": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "token": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["token_version", "issuer", "subject", "audience", "capabilities", "issued_at", "expires_at", "token_id", "signature"],
+      "properties": {
+        "token_version": { "const": 1 },
+        "issuer": { "$ref": "#/$defs/identifier" },
+        "subject": { "$ref": "#/$defs/identifier" },
+        "audience": { "$ref": "#/$defs/identifier" },
+        "capabilities": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 128,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/identifier" }
+        },
+        "issued_at": { "type": "integer", "minimum": 0 },
+        "expires_at": { "type": "integer", "minimum": 1 },
+        "token_id": { "$ref": "#/$defs/identifier" },
+        "signature": { "type": "string", "minLength": 1, "maxLength": 256 }
+      }
+    },
+    "msgbus": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["request_id", "source_device_id", "destination_device_id"],
+      "properties": {
+        "request_id": { "$ref": "#/$defs/identifier" },
+        "source_device_id": { "$ref": "#/$defs/identifier" },
+        "source_device_alias": { "type": "string", "maxLength": 128 },
+        "destination_device_id": { "$ref": "#/$defs/identifier" },
+        "destination_device_alias": { "type": "string", "maxLength": 128 },
+        "priority": { "type": "string", "enum": ["low", "normal", "high"] }
+      }
+    },
+    "netlink": {
+      "type": "object",
+      "description": "Mutable transport-only route metadata. Never used as identity, authorization, or signature input.",
+      "additionalProperties": true,
+      "maxProperties": 32
+    },
+    "request": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["packet_version", "kind", "msgbus", "netlink", "authorization", "payload"],
+      "properties": {
+        "packet_version": { "const": 1 },
+        "kind": { "const": "request" },
+        "msgbus": { "$ref": "#/$defs/msgbus" },
+        "netlink": { "$ref": "#/$defs/netlink" },
+        "authorization": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["authority_id", "authority_public_key", "token", "audience", "capability", "nonce", "sequence", "signature"],
+          "properties": {
+            "authority_id": { "$ref": "#/$defs/identifier" },
+            "authority_public_key": { "type": "string", "minLength": 43, "maxLength": 44 },
+            "token": { "$ref": "#/$defs/token" },
+            "audience": { "$ref": "#/$defs/identifier" },
+            "capability": { "$ref": "#/$defs/identifier" },
+            "nonce": { "type": "string", "minLength": 1, "maxLength": 128 },
+            "sequence": { "type": "integer", "minimum": 1 },
+            "signature": { "type": "string", "minLength": 1, "maxLength": 256 }
+          }
+        },
+        "payload": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["payload_type", "payload_version", "operation", "arguments"],
+          "properties": {
+            "payload_type": { "const": "service.request" },
+            "payload_version": { "const": 1 },
+            "operation": { "type": "string", "minLength": 1, "maxLength": 128 },
+            "arguments": { "type": "object", "maxProperties": 4096 }
+          }
+        }
+      }
+    },
+    "response": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["packet_version", "kind", "msgbus", "netlink", "authorization", "payload"],
+      "properties": {
+        "packet_version": { "const": 1 },
+        "kind": { "const": "response" },
+        "msgbus": { "$ref": "#/$defs/msgbus" },
+        "netlink": { "$ref": "#/$defs/netlink" },
+        "authorization": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["signer_device_id", "signature"],
+          "properties": {
+            "signer_device_id": { "$ref": "#/$defs/identifier" },
+            "signature": { "type": "string", "minLength": 1, "maxLength": 256 }
+          }
+        },
+        "payload": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["payload_type", "payload_version", "in_reply_to"],
+          "properties": {
+            "payload_type": { "const": "service.response" },
+            "payload_version": { "const": 1 },
+            "in_reply_to": { "$ref": "#/$defs/identifier" },
+            "result": {"$ref": "#/$defs/jsonValue"},
+            "error": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["code", "message"],
+              "properties": {
+                "code": { "$ref": "#/$defs/identifier" },
+                "message": { "type": "string", "minLength": 1, "maxLength": 512 }
+              }
+            }
+          },
+          "oneOf": [
+            { "required": ["result"], "not": { "required": ["error"] } },
+            { "required": ["error"], "not": { "required": ["result"] } }
+          ]
+        }
+      }
+    },
+    "jsonValue": {
+      "description": "JSON-compatible value; runtime validation also applies packet depth and size limits.",
+      "oneOf": [
+        {"type": "null"},
+        {"type": "boolean"},
+        {"type": "number"},
+        {"type": "string"},
+        {"type": "array", "items": {"$ref": "#/$defs/jsonValue"}},
+        {"type": "object", "additionalProperties": {"$ref": "#/$defs/jsonValue"}}
+      ]
+    }
+  }
+}

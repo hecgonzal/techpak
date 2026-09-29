@@ -131,29 +131,32 @@ Enrollment therefore requires three conditions:
 - The external admin device roots the host certificate authority. The host operates a local/subordinate CA for enrolled device certificates.
 - The root CA private key remains on the external admin device and is not routinely online. The host receives only the subordinate CA authority required to issue and revoke enrolled device certificates.
 - Python `ssl` provides the TLS interface. The `cryptography` package provides Ed25519 and certificate operations.
-- Private keys and trust data are protected by OS permissions and an encrypted volume. Hardware-backed storage may be used when available, but is not required for the first implementation.
+- The current prototype's raw Ed25519 key files use restrictive filesystem modes under a deployment-created private directory; they are not encrypted and must not be treated as production-protected. Production deployment requires the documented encrypted volume and a dedicated service account. Hardware-backed storage remains optional when available.
 - VPN is optional defense-in-depth. TLS and application authorization remain mandatory when VPN is off.
 
 ┌─────────────────────────────────────────────────────────────┐
 │  📦 PACKET AND AUTHORIZATION LAYERS                         │
 └─────────────────────────────────────────────────────────────┘
 
-Every message has three separate layers:
+Packet version 1 has four top-level sections: `msgbus`, `netlink`, `authorization`, and `payload`.
 
-- MsgBus: source/destination routing headers, aliases, priority, and transport metadata only.
-- Authorization: identity proof, token, audience, permission claims, nonce, sequence, and signatures.
-- Payload: command, telemetry, state, or synchronization content.
+- `msgbus`: request correlation ID and source/destination device IDs, plus unsigned display aliases and priority hints.
+- `netlink`: mutable hop/route transport metadata only. It is outside the application signature and cannot establish identity, audience, or permission.
+- `authorization`: BrainBoard authority ID and pinned public-key value, signed BrainBoard token, audience, capability, nonce, sequence, and request signature; responses carry signer identity and signature. The sender's registered-device signature authenticates the included authority pin; the receiver compares it to its locally pinned BrainBoard key. A receiver needs only the authority public key, never the BrainBoard token-signing private key.
+- `payload`: typed operation and arguments, or a correlated typed result/error. It is covered by the application signature.
 
-The receiver must validate authorization before dispatching the payload. TLS protects the live connection, while application-level authentication is required only where the message risk or lifetime justifies it.
+The receiver must validate authorization before dispatching the payload. This in-process MVP has no transport and provides no network confidentiality or TLS peer authentication. A connected deployment must add TLS 1.3 mutual authentication; it must not remove the packet-level checks implemented for version 1.
 
-Application-level Ed25519 signatures are required for commands, policy and revocation data, update artifacts, synchronization manifests, audit records, messages stored for later verification, and messages crossing an untrusted intermediary. Ordinary live telemetry may rely on mTLS, authorization, and the payload hash without an Ed25519 signature.
+For the Authlite packet MVP, every request and response is protected by an application-level Ed25519 signature, including live telemetry. This is intentionally stronger than the eventual optimized profile, where ordinary live telemetry may rely on mTLS, authorization, and integrity checks. Any later reduction in signature coverage requires a versioned security decision and tests. While this no-socket prototype has no mTLS, do not use it over an untrusted network: application signatures provide authenticity/integrity, not confidentiality or transport peer authentication.
 
-When an application signature is required, the proof covers:
+For packet version 1, the proof covers:
 
-- A canonical hash of the complete packet, including MsgBus, Authorization, and Payload layers.
-- A separate hash of the payload for independent payload-integrity checks.
+- Packet version and kind.
+- The request ID plus source and destination device IDs (or the response signer/destination IDs).
+- The authority ID/key pin, complete authorization token and claims, audience, capability, nonce, sequence, and payload.
+- For responses, the request correlation ID and response result or error.
 
-Both hashes are covered by the Ed25519 signature. Changing routing headers, authorization claims, or payload content invalidates the proof. The exact canonicalization rules belong in the packet schema.
+Aliases, priority, and the separate Netlink hop/route object are mutable transport hints and are not signed. They must never be used as proof of identity, destination authorization, or permission. Changing a signed ID, authorization claim, token, operation, argument, result, or error invalidates the signature. Packet version 1 uses RFC 8785 JSON Canonicalization Scheme bytes. Keep the message-class optimization above disabled for this MVP.
 
 ┌─────────────────────────────────────────────────────────────┐
 │  🎫 TOKENS, REFRESH, AND PERMISSIONS                        │
@@ -260,6 +263,15 @@ Key rotation and certificate replacement are distinct from device recovery. Reco
 │  📊 LOGGING AND INCIDENT RESPONSE                            │
 └─────────────────────────────────────────────────────────────┘
 
+Keep local log purposes distinct:
+
+- Master log: append-oriented raw operational, conversation, and service records required for audit or recovery. Redact credentials, keys, tokens, and data prohibited by local policy. Plain JSONL is not tamper-evident.
+- Working log: a compact projection of selected conversation records for Ruppert prompt context. It is a retrieval aid, not the authoritative record; bound prompt inclusion now and define on-disk retention/rotation before deployment.
+- `TechServicesLog`: metadata-only start/completion/error events for each public service invocation on the device. Include timestamp, service, operation, call ID, request ID when available, status, duration, and a bounded error summary. Do not include request/response payloads.
+- Security audit and quarantine: protected records for authentication, authorization, revocation, replay, enrollment, and incident events. Keep these isolated from ordinary service and prompt logs.
+
+Every public service entry point must pass through a logged dispatcher or logging wrapper. If the process dies after the start event, the unmatched call remains visible as incomplete. Logging failure must not turn a successful read-only telemetry call into a failure; security-sensitive commands still fail closed if required protected audit storage is unavailable.
+
 The authorization layer records enrollment, failed permission checks, invalid signatures, replay attempts, token expiration, revocation, recovery, lockout, and admin actions.
 
 Suspicious packets are quarantined in full on the segregated partition and are never executed. The user and administrator are notified according to local policy. Quarantine storage must be access-controlled and protected from ordinary service writes.
@@ -291,7 +303,7 @@ Deferred until the protocol has real implementation and test evidence:
 - Advanced time-derived key sequences
 - Universal network keys
 
-The next implementation step is to define the authorization packet schema, including canonicalization and signature-required message classes, followed by `tp-authlite`, registry storage, and `tp-configd` policy enforcement.
+The Authlite packet-v1 schema and an in-process Authlite prototype now exist under `Technet/services/netservice/tp_authlite/`. The prototype includes Ed25519 packet/token signatures, local enrollment proof APIs, SQLite registry/policy/replay state, and a receiver dispatcher. It does not provide TLS/mTLS, network sockets, a production certificate authority, a production physical-confirmation provider, or distributed `tp-configd`/`tp-registry` services. Those remain required before any network deployment.
 
 ================================================================
 SHORT-TERM SECURITY IMPLEMENTATION PLAN
@@ -299,39 +311,46 @@ SHORT-TERM SECURITY IMPLEMENTATION PLAN
 
 Purpose
 
-The short-term plan creates a secure, understandable MVP. It intentionally uses the smallest set of mechanisms that provide useful protection for an enrolled local device network:
+The short-term plan creates a secure, understandable MVP. The current first milestone is an in-process, no-socket prototype; the eventual connected deployment adds the TLS transport shown below. Do not interpret packet signatures alone as providing network confidentiality, peer TLS authentication, or production enrollment:
 
-    Enrollment
-        -> Device identity
-        -> TLS 1.3 mutual authentication
-        -> Host-signed authorization token
-        -> Local permission check
-        -> Payload execution
+    In-process MVP:
+        Enrollment proof -> Device identity -> Signed typed packet
+        -> Host-signed authorization token -> Local policy/replay check
+        -> Service validation -> Payload execution
+
+    Later connected deployment:
+        TLS 1.3 mutual authentication -> The same Authlite packet and receiver checks
 
 The MVP must not attempt to implement every long-term feature at once. Each feature below must have a small public interface so that stronger controls can be added later without rewriting PackService or MsgBus.
 
 MVP security boundary
 
-Required in the short term:
+Implemented in the current in-process prototype:
 
 - Device-generated Ed25519 identity keypair.
-- Manual enrollment approved by the host and confirmed by a physical or host-assisted hardware action.
-- TLS 1.3 mutual authentication for normal device connections.
+- BrainBoard-approved enrollment session, injectable local-confirmation provider, one-time cryptographic challenge, and one-hour/60-second timeouts.
 - A host-signed, one-hour authorization token.
-- Local capability and resource/action permission checks on every receiving device.
-- Basic device revocation checked before a session or command is accepted.
-- Unique request IDs and nonces for commands.
-- Signed update manifests and administrator approval for executable updates.
-- OS permissions and encrypted storage for private keys and registry data.
-- Security-event logging without executing rejected requests.
+- Local device/audience/capability checks on a receiver before registered operations execute.
+- Device/token revocation and durable per-peer outgoing sequence, incoming sequence, request-ID, and nonce checks.
+- Ed25519 signatures on every version-1 request and response using RFC 8785 canonical JSON.
+- Permission-locked file key storage and SQLite state with metadata-only security events.
+- Metadata-only service-call events and signed success/denial/error responses from the in-process dispatcher.
 
-Deferred from the MVP unless a real requirement appears:
+Still required before network deployment:
+
+- TLS 1.3 mutual authentication, certificate issuance/validation/renewal, and socket/transport integration.
+- A real local GPIO/button or trusted host-assisted physical-confirmation provider. Development callbacks/CLI are not physical proof.
+- Dedicated service-account deployment, backup/recovery and tested filesystem/database permissions on the target Linux image.
+- Production admin authentication for enrollment approval, token issuance, policy changes, revocation and manual BrainBoard promotion.
+- Distributed policy/registry services, quarantine lifecycle, transport-level size/rate limits, and end-to-end integration tests.
+
+Deferred to later phases:
 
 - Fistbump as an authorization condition.
-- Ed25519 signatures on ordinary live telemetry.
-- Persistent per-peer sequence counters.
 - A subordinate CA hierarchy rooted on an offline admin device.
 - General offline command leases.
+- Distributed signed policy and revocation epochs.
+- Sync manifests, log replication, signed updates and rotation/recovery workflows.
 - Dynamic trust graphs and federated TechNets.
 
 MVP package composition
@@ -340,19 +359,19 @@ Use Python 3 and keep the service layer small. The recommended external dependen
 
 Do not implement cryptography manually. Do not use passwords as device identity. Do not use a device ID, alias, MAC address, or IP address as proof of identity.
 
-Suggested package layout:
+Current package layout (some modules remain interfaces or future integration work):
 
     Technet/services/
         tp_authlite/
             __init__.py
-            identity.py       # key generation, public-key fingerprints
-            enrollment.py     # pending enrollment and approval state
-            certificates.py   # certificate creation and verification boundary
-            tokens.py          # host-signed token issue and verification
-            permissions.py    # capability and resource/action checks
-            revocation.py     # current revoked-device state
-            storage.py        # atomic protected local persistence
+            authlite.py       # enrollment, issuance and receiver verification APIs
+            canonical.py      # RFC 8785 canonicalization and packet bounds
+            dispatcher.py     # verify/policy/validate/log/execute boundary
             errors.py         # typed auth failures
+            keys.py           # permission-locked MVP Ed25519 key files
+            packet.py         # signed typed requests and correlated replies
+            storage.py        # SQLite registry, policy, replay state and audit metadata
+            tokens.py         # BrainBoard-signed capability token issue/verification
         tp_configd/
             __init__.py
             policy.py          # policy loading and validation
@@ -399,10 +418,14 @@ MVP normal connection sequence
 1. The device connects using TLS 1.3 mutual authentication.
 2. The host verifies the certificate chain, certificate validity period, registry fingerprint, and revocation state.
 3. `tp-authlite` issues or refreshes a one-hour token through the authenticated TLS session.
-4. The sender submits a request with a token, destination/audience, unique request ID, nonce, command type, and payload.
-5. The receiving device verifies the token and evaluates local policy.
-6. The receiver rejects the request before invoking a service if any check fails.
-7. The receiver logs the decision and executes the payload only after authorization succeeds.
+4. The requesting service creates a typed service request. A natural-language prompt is used only when the destination service is an AI model; it is not the general network command format.
+5. The sender creates a request ID and nonce, binds the destination/audience and payload to its authorization material, and places mutable hop/route data in a separate Netlink transport layer.
+6. `tp-msgbus` transports the packet using its routing headers. It does not grant permission or modify the authenticated request contents.
+7. The destination verifies identity, token, audience, expiry, nonce/request ID, and integrity. It evaluates policy and validates service-specific arguments locally.
+8. The destination records the authorization outcome. Rejected requests are not dispatched. An authorized call is recorded in `TechServicesLog` when service execution begins and when it completes or fails.
+9. The requested service produces a response carrying the same request ID. The response is authenticated and returned through MsgBus; the sender verifies and logs it.
+
+The destination may record service output in the raw master log when the data policy permits. Never put tokens, private keys, authorization secrets, or unrestricted sensitive payloads into ordinary operational logs. The `TechServicesLog` is metadata-only; protected security audit and quarantine data use separate storage.
 
 MVP token format
 
@@ -414,13 +437,13 @@ Keep the token claims minimal and versioned:
       "subject": "requesting-device-id",
       "audience": "target-service-or-device",
       "capabilities": ["telemetry.read"],
-      "issued_at": "timestamp",
-      "expires_at": "timestamp",
+            "issued_at": 1800000000,
+            "expires_at": 1800003600,
       "token_id": "unique-id",
-      "signature": "host-signature"
+            "signature": "base64url-ed25519-signature"
     }
 
-The token is not a password and must not be accepted without verifying its signature. Keep token parsing, claim validation, and policy evaluation separate so future claims such as policy epoch or key ID can be added without changing the message router.
+The prototype token signature covers the RFC 8785 canonical JSON encoding of every claim except `signature`. Timestamps are integer Unix seconds. The token is not a password and must not be accepted without verifying its signature. Keep token parsing, claim validation, and policy evaluation separate so future claims such as policy epoch or key ID can be added without changing the message router. Use a distinct BrainBoard token-signing key from its device identity key; production provisioning/rotation for that key remains to be implemented.
 
 MVP replay and failure handling
 

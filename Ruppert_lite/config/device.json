@@ -11,7 +11,11 @@
     "device_thermal": "normal",
 
     "log_path": "Ruppert_lite/logs/testlog.jsonl",
+    "master_log_path": "Ruppert_lite/logs/testlog.jsonl",
+    "working_log_path": "Ruppert_lite/logs/workinglog.jsonl",
+    "tech_services_log_path": "Ruppert_lite/logs/TechServicesLog.jsonl",
 
     "ai_model": "Gemma3Adapter",
+    "working_log_adapter": "Gemma3Adapter",
     "rupert_shell_version": "0.1"
 }

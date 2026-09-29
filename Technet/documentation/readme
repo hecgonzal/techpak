@@ -67,9 +67,11 @@ These daemons form the Techpack OS layer and run on all devices unless restricte
     - Environmental readings
     - Runs on wearable and packboard devices
   - `tp-ruppertlog` — Distributed logging backend
-    - JSONL append
-    - Schema registry
-    - Log streaming
+    - Master log: raw operational/conversation records, with secrets redacted
+    - Working log: compact, searchable context for Ruppert prompts
+    - `TechServicesLog`: metadata for each service invocation on the device
+    - Separate protected security-audit and quarantine storage
+    - JSONL append, schema registry, and log streaming (planned)
     - Backend for Ruppert-lite
   - `tp-syncd` — State and file synchronization
     - Delta-based sync
@@ -85,8 +87,8 @@ These daemons form the Techpack OS layer and run on all devices unless restricte
 
 - TechNet (Operations required for intra-network communication)
   - `tp-netlink` — Network presence and device discovery
-    - Broadcast device ID
-    - Capability flags
+    - Minimal unauthenticated presence only
+    - Identity, capabilities, and detailed routes only for authenticated peers
     - Heartbeat
     - Mesh presence
     - Foundation for inter-device awareness
@@ -96,7 +98,8 @@ These daemons form the Techpack OS layer and run on all devices unless restricte
     - Command routing
     - Telemetry streaming
     - Backbone of Techpack communication
-  - `tp-authlite` — Network authetication
+  - `tp-authlite` — Device identity, enrollment proof, signed tokens, packet verification and receiver-side authorization
+    - Current implementation is an in-process prototype; it does not yet provide TLS sockets or a production certificate authority
   - `tp-registry` — Device Registry/Capability tracking
     - known devices
     - identity keys
@@ -115,11 +118,11 @@ These daemons form the Techpack OS layer and run on all devices unless restricte
     - Patch deltas
     - Service restarts
     - Does not update the OS; only Techpack modules
-  - `tp-authorizor` — User/Device Management
-    - user profile permissions
-    - device profile enforcement
-    - device capability 
-    - access control
+  - `tp-authorizor` — Planned user/device administration interface
+    - Manages user and device profile records
+    - Submits policy changes to `tp-configd`
+    - Does not make per-request runtime authorization decisions
+    - Not a separate authority service in the initial security implementation
 
 ### System Services GUI (Screen-Detected Only)
 
@@ -337,7 +340,17 @@ Each device maintains:
 - Techpack logs (`tp-ruppertlog`)
 - Health logs (`tp-healthstats`)
 
-Synchronization rules determine what data is shared across the network.
+Synchronization rules determine what data is shared across the network. The master
+log keeps raw application records but must redact credentials, tokens, private keys,
+and other policy-protected secrets. Security audit and quarantine records remain in
+separate protected storage. The working log is a compact retrieval index, not the
+authoritative record.
+
+The current Ruppert prototype uses three local JSONL files: `testlog.jsonl` as the
+master conversation/raw-record log, `workinglog.jsonl` for compact prompt context,
+and `TechServicesLog.jsonl` for service-call metadata. JSONL append mode is not
+tamper-evident storage; protection, retention, rotation, and selective synchronization
+remain deployment requirements.
 
 ### Segregated Permissions Structure
 
@@ -347,7 +360,12 @@ The ecosystem uses a layered permissions model built on:
 - Capability flags
 - Profile-based restrictions
 - Sandboxing via systemd and namespaces
-- `tp-msgbus` ACLs
+- `tp-msgbus` transport allowlists (routing filters only; not authorization)
+
+The destination verifies identity with `tp-authlite`, evaluates policy through
+`tp-configd`, and applies service-specific checks before executing a request.
+Every public service entry point must record its invocation in `TechServicesLog`;
+the log records metadata and outcomes, not payload contents.
 
 Example: a compromised wearable cannot modify workstation configurations or impersonate another device.
 

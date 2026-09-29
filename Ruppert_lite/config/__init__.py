@@ -1,4 +1,3 @@
-
 import os
 import json
 
@@ -17,7 +16,14 @@ class ShellConfig:
         self.device_battery = data["device_battery"]
         self.device_thermal = data["device_thermal"]
         self.log_path = data.get("log_path", "Ruppert_lite/logs/testlog.jsonl")
+        self.master_log_path = data.get("master_log_path", self.log_path)
+        self.working_log_path = data.get("working_log_path", "Ruppert_lite/logs/workinglog.jsonl")
+        self.tech_services_log_path = data.get(
+            "tech_services_log_path",
+            "Ruppert_lite/logs/TechServicesLog.jsonl",
+        )
         self.ai_model = data["ai_model"]
+        self.working_log_adapter = data.get("working_log_adapter", self.ai_model)
 
         self.rupert_shell_version = data["rupert_shell_version"]
 
@@ -30,4 +36,6 @@ class ShellConfig:
             "vpn": self.vpn,
             "device_battery": self.device_battery,
             "device_thermal": self.device_thermal,
+            "ai_model": self.ai_model,
+            "working_log_adapter": self.working_log_adapter,
         }

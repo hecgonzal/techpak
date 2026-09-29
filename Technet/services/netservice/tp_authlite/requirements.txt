@@ -1,0 +1,3 @@
+# Exact versions used by the Authlite MVP implementation/tests; review before production deployment.
+cryptography==50.0.1
+rfc8785==0.1.4

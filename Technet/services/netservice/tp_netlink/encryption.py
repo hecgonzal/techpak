@@ -1,10 +1,10 @@
-"""Encryption field for tp-netlink.
+"""Deprecated compatibility stub; encryption is not a Netlink route field.
 
-TODO: actual encryption negotiation and keying should be handled by tp-authlite or
-other security layers. Until then we keep this explicitly unset.
+Transport encryption is negotiated by the secure transport. This helper is not
+used by the Netlink packet builder and must not imply that a link is protected.
 """
 
 
 def get_encryption():
-    """Return the encryption mode for the active network transport."""
+    """Return the legacy unknown placeholder; inspect transport state instead."""
     return "unknown"

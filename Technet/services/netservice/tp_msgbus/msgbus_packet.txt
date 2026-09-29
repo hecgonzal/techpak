@@ -1,7 +1,45 @@
 {
-  "source_device_id": "",
-  "source_device_alias": "",
-  "destination_device_id": "",
-  "destination_device_alias": "",
-  "priority": ""
+  "packet_version": 1,
+  "kind": "request",
+  "msgbus": {
+    "request_id": "unique-request-id",
+    "source_device_id": "source-device-id",
+    "source_device_alias": "source-label",
+    "destination_device_id": "destination-device-id",
+    "destination_device_alias": "destination-label",
+    "priority": "normal"
+  },
+  "netlink": {
+    "hop_count": 0,
+    "mesh_route": [],
+    "link_quality": "unknown"
+  },
+  "authorization": {
+    "authority_id": "brainboard-device-id",
+    "authority_public_key": "base64url-ed25519-public-key",
+    "token": {
+      "token_version": 1,
+      "issuer": "brainboard-device-id",
+      "subject": "source-device-id",
+      "audience": "tp-sysinfo",
+      "capabilities": ["telemetry.read"],
+      "issued_at": 1800000000,
+      "expires_at": 1800003600,
+      "token_id": "unique-token-id",
+      "signature": "base64url-ed25519-signature"
+    },
+    "audience": "tp-sysinfo",
+    "capability": "telemetry.read",
+    "nonce": "cryptographically-random-unique-value",
+    "sequence": 1,
+    "signature": "base64url-ed25519-signature"
+  },
+  "payload": {
+    "payload_type": "service.request",
+    "payload_version": 1,
+    "operation": "sysinfo.get",
+    "arguments": {
+      "fields": ["battery"]
+    }
+  }
 }

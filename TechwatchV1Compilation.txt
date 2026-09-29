@@ -1,0 +1,842 @@
+<details>
+<summary><strong>Adafruit BNO055 Absolute Orientation IMU</strong></summary>
+
+**Product Page:** [link ](https://www.amazon.com/Adafruit-Absolute-Orientation-Fusion-Breakout/dp/B017PEIGIG?dib=eyJ2IjoiMSJ9.vfrF_haHntYtaiNWEZz4jiRbHG9HtU8kzae5JejJJn2jQ447qmo1ZVOSZ0P04sYrIqOVBi868R9R7GXV_z1VgorHHXu-p30eSX7xaUtVdCZAj8Jz71To81jrNhldWbpKyBKMrGAqzy2IS8s5j8-Um4Gz5uLilxJu3uYhhYSZW_jSGtLPZa4EzOPCjjiamcaT_z2V9guMkI36O4GLRevrLKSv01BZEs0H_mvS4MvLuE8.b6TWLNXdtycy8I_N8ibKxHE-vSiqNkT_Kvt55M66JM0&dib_tag=se&keywords=bno055&qid=1789490094&sbo=RZvfv%2F%2FHxDF%2BO5021pAnSA%3D%3D&sr=8-1) 
+**Category:** Motion Sensor (IMU + Sensor Fusion)
+
+![](https://m.media-amazon.com/images/I/51qEXrfKgTL._SL1200_.jpg)
+
+<details>
+<summary><strong>Hardware Overview</strong></summary>
+
+**Type:** 9‑DOF IMU with onboard sensor fusion  
+**Sensor Package:** Bosch BNO055 (Accel + Gyro + Magnetometer + Cortex‑M0 fusion MCU)  
+**Form Factor:** Adafruit breakout (header soldering required)
+
+**Dimensions:**  
+- **Width:** 20 mm  
+- **Length:** 27 mm  
+- **Height:** 4 mm  
+- **Weight:** ~3 g  
+
+**Mounting:**  
+- 4 mounting holes  
+- Hole spacing: 20 mm × 12 mm apart 
+
+</details>
+
+<details>
+<summary><strong>Electrical & Wiring</strong></summary>
+
+**Operating Voltage:**  
+- VIN: **3.3V–5.0V** (onboard regulator)  
+- Logic: **3.3V** (level shifting included) 
+
+**Interfaces:**  
+- **I²C** (default, address 0x28 or 0x29)  
+- **UART** (optional) 
+
+**Pins:**  
+**BNO055 → ESP32-S3**
+
+- **VIN → 3.3V**
+- **GND → GND**
+- **SCL → GPIO 10**
+- **SDA → GPIO 11**
+- **RST → 3.3V** (or GPIO if needed)
+- **INT → optional**
+- **ADR → GND** (address = 0x28)
+- **PS0 → GND** (I²C mode)
+- **PS1 → GND** (I²C mode)
+
+**Wiring Notes:**  
+- Use I²C for simplest integration  
+- ADR pin selects address (0x28 / 0x29)  
+- External 32.768 kHz crystal included for best fusion performance   
+- Fully compatible with ESP32‑S3 (newer ESP‑IDF recommended) 
+
+**Notes:**
+- Use I²C mode unless you have a specific reason to use UART.
+- ADR pin selects address:  
+  - ADR = GND → 0x28  
+  - ADR = 3.3V → 0x29  
+- External crystal is already on the breakout (no wiring needed).
+- Logic level shifting is built‑in → safe for ESP32‑S3.
+
+</details>
+
+<details>
+<summary><strong>Compute & Software</strong></summary>
+
+**Onboard Processor:** ARM Cortex‑M0+ running Bosch fusion firmware  
+**Fusion Output Types:**  
+- Absolute Orientation (Euler, 100 Hz)  
+- Absolute Orientation (Quaternion, 100 Hz)  
+- Angular Velocity (100 Hz)  
+- Acceleration (100 Hz)  
+- Linear Acceleration (100 Hz)  
+- Gravity Vector (100 Hz)  
+- Magnetic Field Strength (20 Hz)  
+- Temperature (1 Hz) 
+
+**Supported Libraries:**  
+- Adafruit BNO055 (Arduino)  
+- CircuitPython  
+- ESP‑IDF (newer versions recommended) 
+
+**Important Compatibility Note:**  
+- BNO055 violates I²C protocol in some cases → issues with NXP i.MX RT1011 and I²C multiplexers  
+- Works reliably with ESP32‑S3 using updated ESP‑IDF / CircuitPython 9.2.2+ 
+
+</details>
+
+<details>
+<summary><strong>Notes</strong></summary>
+
+- Provides fused orientation data without writing fusion algorithms  
+- Best IMU choice for your smartwatch (stable, drift‑free orientation)  
+- Requires soldering headers unless using STEMMA QT version  
+- Use quaternion output for gesture recognition  
+- Place away from magnets, speakers, or motors  
+- More accurate and easier than MPU‑9250/LSM9DS1 (no fusion code needed)
+
+</details>
+
+</details>
+<details>
+<summary><strong>BME280 Environmental Sensor (Bosch Sensortec)</strong></summary>
+
+**Product Page:** https://www.digikey.com/en/products/detail/bosch-sensortec/BME280/5187229  
+**Category:** Environmental Sensor (Temp / Humidity / Pressure)
+
+<details>
+<summary><strong>Hardware Overview</strong></summary>
+
+**Type:** Integrated environmental sensor  
+**Functions:** Temperature, humidity, barometric pressure  
+**Package:** 8‑pin LGA (2.5 × 2.5 mm)  
+**Mounting:** Surface mount (SMT)  
+
+**Dimensions:**  
+- **Width:** 2.5 mm  
+- **Length:** 2.5 mm  
+- **Height:** ~0.93 mm  
+
+**Operating Temperature:** –40°C to +85°C  
+**Humidity Range:** 0–100% RH  
+
+</details>
+
+<details>
+<summary><strong>Electrical & Wiring</strong></summary>
+
+**Supply Voltage:** 1.71V – 3.6V  
+**Recommended Voltage:** 3.3V  
+**Logic Level:** 3.3V  
+
+**Interfaces:**  
+- **I²C**  
+- **SPI**  
+
+**Accuracy:**  
+- **Humidity:** ±3% RH  
+- **Temperature:** ±1°C typical  
+- **Pressure:** ±1 hPa  
+
+**Response Time:** 1 second  
+
+**Wiring Notes:**  
+- Works perfectly with ESP32‑S3 at 3.3V  
+- Use I²C for simplest integration  
+- SDO pin sets I²C address (0x76 or 0x77)  
+- Keep away from heat sources (battery, MCU) for accurate readings  
+
+</details>
+
+<details>
+<summary><strong>Compute & Software</strong></summary>
+
+**Supported Libraries:**  
+- Adafruit BME280  
+- SparkFun BME280  
+- Bosch official driver  
+
+**Data Outputs:**  
+- Temperature (°C)  
+- Humidity (%)  
+- Pressure (Pa / hPa)  
+- Derived altitude  
+
+**Notes for ESP32‑S3:**  
+- Use hardware I²C for stable readings  
+- Sampling modes configurable (forced, normal, sleep)  
+
+</details>
+
+<details>
+<summary><strong>Notes</strong></summary>
+
+- Very low power consumption  
+- Ideal for environmental sensing in wearables  
+- More accurate and capable than BMP180/BMP183  
+- Works flawlessly with your LilyGo T‑Display‑S3  
+- Place sensor near ventilation openings in enclosure  
+
+</details>
+
+</details>
+<details>
+<summary><strong>Boardoza MCP73831 Lithium Battery Charger Breakout Board</strong></summary>
+
+https://products.boardoza.com/media/fwZcKUSuwHIxMcol.jpg
+**Product Page:** [link  ](https://products.boardoza.com/product/boardoza-mcp73831-lithium-battery-charger-breakout-board)
+
+![[MCP73831.jpg]]
+
+<details>
+<summary><strong>Hardware Overview</strong></summary>
+
+**Type:** Single‑cell Li‑Ion / Li‑Po charger module  
+**Charge Controller:** Microchip MCP73831  
+**Form Factor:** Compact breakout board  
+
+**Dimensions:**  
+- **Width:** 20 mm  
+- **Length:** 40 mm  
+- **Height:** (not specified, ~3–5 mm typical)  
+- **Weight:** (not specified, negligible)
+
+</details>
+
+<details>
+<summary><strong>Electrical & Wiring</strong></summary>
+
+**Input Voltage Range:** 3.75V – 6V  
+**Charge Voltage:** 4.2V (fixed, 1S Li‑Ion/Li‑Po)  
+**Max Charge Current:** Up to 500 mA (set by R3 resistor)  
+
+**Protections:**  
+- Reverse discharge  
+- Thermal regulation  
+- Short‑circuit protection  
+- Voltage monitoring  
+
+**Power Input Options:**  
+- USB Type‑C  
+- Solderable 5V pads  
+
+**Battery Output:**  
+- **Connector:** J1 (2‑pin battery header)  
+- **Pin 1:** Battery +  
+- **Pin 2:** Battery –  
+
+**Wiring Notes:**  
+- USB‑C → 5V input  
+- Battery connects directly to J1  
+- Charge current adjustable via R3  
+- Use NTC from battery only if your PMIC supports it (charger itself does not read NTC)
+
+</details>
+
+<details>
+<summary><strong>Compute & Software</strong></summary>
+
+**MCU:** None  
+**Firmware:** None  
+**Driver Requirements:** None  
+**Behavior:** Fully hardware‑managed linear charging  
+
+</details>
+
+<details>
+<summary><strong>Notes</strong></summary>
+
+- Ideal for compact wearables and embedded devices  
+- Linear charger → simple, low noise, but generates heat at higher currents  
+- 500 mA max charge current is safe for most 1S LiPo cells  
+- USB‑C input is convenient for smartwatch charging  
+- Board size fits easily inside watch enclosures  
+- Good match for your LP286380 2000mAh battery (0.5C charging)  
+- No boost or buck conversion — strictly a charger  
+
+</details>
+
+</details>
+**Product Page:** [link](https://lilygo.cc/products/t-display-s3?variant=42589373268149)
+
+---
+
+### Hardware Overview
+
+![LILYGO T-Display-S3 Touch](https://cdn.shopify.com/s/files/1/0617/7190/7253/files/LILYGO-T-Display-S3-Touch-version_7_1024x1024.jpg?v=1667462434)
+
+**Width:** 32 mm  
+**Length:** 62 mm  
+**Height:** 11 mm  
+**Weight:**
+
+**Form Factor:** Rectangular module
+
+---
+
+### Electrical & Wiring
+
+**Voltage Requirements:** 3.3V
+
+**Passive Draw:**
+
+**Max Draw:**
+
+**Charging Method:** USB-C / LiPo charger
+
+**Power Modes:** Deep sleep, light sleep
+
+**Ports:**
+
+- USB-C
+    
+- JST-PH LiPo
+    
+- I²C (SDA/SCL)
+    
+- SPI (MOSI/MISO/SCK/CS)
+    
+- UART (TX/RX)
+    
+- GPIO pins
+    
+- Boot + Reset buttons
+    
+
+**Wiring Diagrams:**
+
+T-DISPLAY-S3-Touch_1024x1024.webp
+
+**Port Diagrams:**
+
+![T-Display-S3 Port Diagram](https://cdn.shopify.com/s/files/1/0617/7190/7253/files/LILYGO-T-DIPLAY-S3-MIDI_2_600x600.jpg?v=1697610629)
+
+---
+
+### Compute & Software
+
+**MCU:** ESP32-S3R8 Dual-core LX7
+
+**Clock Speed:**
+
+**RAM:** 8 MB PSRAM
+
+**Flash:** 16 MB
+
+**Supported Languages:** Arduino IDE, MicroPython
+
+**Frameworks / SDKs:** Arduino, ESP-IDF
+
+**Networks:**
+
+- Wi-Fi 802.11 b/g/n
+    
+- BLE 5 + BT Mesh
+    
+- ESP-NOW
+    
+
+---
+
+### Display
+
+**Type:** TFT LCD
+
+**Size:** 1.9"
+
+**Resolution:** 170(H) RGB × 320(V)
+
+**Touch Support:** Yes
+
+---
+
+### Notes
+
+- Ideal for smartwatch prototyping
+    
+- Works with all 3.3V sensors
+    
+- Built-in display reduces wiring
+    
+- Good library support
+
+<details>
+<summary><strong>LP286380 3.7V 2000mAh LiPo Battery</strong></summary>
+
+**Product Page:** [link](https://www.lipobattery.us/ultra-thin-li-poly-battery-lp286380-3-7-v-2000mah/)
+[![LP286380 3.7V 2000mAh 0](https://www.lipobattery.us/wp-content/uploads/2019/05/LP286380-3.7V-2000mAh-0.jpg)](https://www.lipobattery.us/wp-content/uploads/2019/05/LP286380-3.7V-2000mAh-0.jpg "LP286380 3.7V 2000mAh 0")
+<details>
+<summary><strong>Hardware Overview</strong></summary>
+
+**Type:** Ultra‑thin Li‑Polymer Battery  
+**Form Factor:** Flat pouch cell  
+
+**Dimensions:**  
+- **Thickness:** 2.8 mm  
+- **Width:** 61.9 mm  
+- **Length:** 80.4 mm  
+- **Weight:** ~40 g  
+
+**Configuration:** 1S1P  
+
+</details>
+
+<details>
+<summary><strong>Electrical & Wiring</strong></summary>
+
+**Nominal Voltage:** 3.7V  
+**Operating Voltage Range:** 2.75V → 4.2V  
+**Capacity:** 2000mAh  
+**Energy Rating:** 7.4Wh  
+
+**Protection Circuit (PCM):** Yes  
+- Over‑charge protection  
+- Over‑discharge protection  
+- Over‑current protection  
+
+**Thermistor:** 10KΩ NTC (B3380)  
+**Connector:** JST SHR‑03V‑S‑B (3‑pin)  
+
+**Charge Specs:**  
+- **Max Charge Voltage:** 4.2V ± 50mV  
+- **Max Charge Current:** 1000mA (1C)  
+
+**Discharge Specs:**  
+- **Max Continuous Discharge:** 2000mA (1C)  
+- **Cutoff Voltage:** 2.75V  
+- **Internal Impedance:** <200mΩ  
+
+**Wiring Notes:**  
+- Red = +  
+- Black = –  
+- Third wire = NTC (to charger/PMIC)  
+
+</details>
+
+<details>
+<summary><strong>Notes</strong></summary>
+
+- Ultra‑thin profile ideal for smartwatch enclosures  
+- PCM
+
+<details>
+<summary><strong>ProtoCentral MAX30003 Single‑Lead ECG Breakout Board V2</strong></summary>
+
+**Product Page:** https://protocentral.com/product/protocentral-max30003-single-lead-ecg-breakout-board-v2/  
+**Documentation:** https://protocentral.com/product/protocentral-max30003-single-lead-ecg-breakout-board-v2/#documentation  
+**Category:** Biomedical Sensor (ECG / Heart Monitoring)
+
+![[protocentral-max30003-single-lead-ecg-breakout-angle.webp]]
+
+<details>
+<summary><strong>Hardware Overview</strong></summary>
+
+**Type:** Single‑lead ECG front‑end module  
+**Chip:** MAX30003 (Maxim Integrated / Analog Devices)  
+**Function:** ECG acquisition + R‑peak detection + heart rate calculation  
+
+**Dimensions:**  
+- Approx: ~25 mm × 25 mm (based on PCB photos; breakout size varies slightly)  
+- Mounting: Standard breakout with header pins  
+
+**Features:**  
+- Integrated ECG analog front‑end  
+- Built‑in R‑to‑R interval detection  
+- Onboard lead‑off detection  
+- Low‑noise instrumentation amplifier  
+- Designed for wearable/portable medical devices  
+
+</details>
+
+<details>
+<summary><strong>Electrical & Wiring</strong></summary>
+
+**Operating Voltage:** 3.3V  
+**Logic Level:** 3.3V  
+**Power Consumption:** Ultra‑low (designed for battery‑powered wearables)
+
+**Interface:**  
+- **SPI** (required — MAX30003 is SPI‑only)
+
+**Pins (from ProtoCentral breakout):**  
+- **VIN → 3.3V**  
+- **GND → GND**  
+- **MISO → ESP32 MISO**  
+- **MOSI → ESP32 MOSI**  
+- **SCK → ESP32 SCK**  
+- **CS → Any ESP32 GPIO**  
+- **INT → Any ESP32 GPIO (interrupt for R‑peak detection)**  
+
+**Electrode Connections:**  
+- **ECG+**  
+- **ECG–**  
+- **Right‑leg drive (RLD)**  
+- 
+![[Screenshot 2026-09-15 164505.png]]
+
+**Wiring Notes:**  
+- SPI required — MAX30003 does not support I²C  
+- INT pin is important for real‑time R‑peak interrupts  
+- RLD improves noise rejection and stability  
+- Use shielded ECG cables for best performance  
+
+</details>
+
+<details>
+<summary><strong>Compute & Software</strong></summary>
+
+**Data Outputs:**  
+- Raw ECG waveform  
+- R‑peak interrupts  
+- Heart rate (via R‑R interval)  
+- Lead‑off status  
+
+**Supported Libraries:**  
+- ProtoCentral MAX30003 Arduino library  
+- ESP32 SPI drivers  
+- Example code provided in ProtoCentral documentation  
+
+**Sampling:**  
+- Configurable sample rate  
+- High‑resolution ECG capture  
+
+**Notes for ESP32‑S3:**  
+- Use HSPI or VSPI bus  
+- INT pin should be attached to an interrupt‑capable GPIO  
+- Ensure stable 3.3V supply (no 5V tolerance)  
+
+</details>
+
+<details>
+<summary><strong>Notes</strong></summary>
+
+- Excellent for wearable ECG applications  
+- Very low noise and high accuracy  
+- Single‑lead ECG suitable for heart rate + R‑peak detection  
+- Works well with your LP286380 LiPo + MCP73831 charger  
+- Combine with MAX30102 for hybrid ECG + PPG heart monitoring  
+- Keep analog front‑end away from switching regulators and antennas  
+- RLD electrode improves signal quality significantly  
+
+</details>
+
+</details>
+
+<details>
+<summary><strong>MAX30102 Heart Rate & SpO₂ Sensor Module</strong></summary>
+
+**Product Page:** (add link if desired)  
+**Category:** Biomedical Sensor (PPG / Heart Rate / SpO₂)
+
+![](https://m.media-amazon.com/images/I/515DHCI4BsL._SL1086_.jpg)
+
+<details>
+<summary><strong>Hardware Overview</strong></summary>
+
+**Type:** Optical PPG sensor module  
+**Chip:** MAX30102 (Maxim Integrated / Analog Devices)  
+**Functions:** Heart rate (PPG), SpO₂, pulse waveform  
+
+**Integrated Components:**  
+- Red LED (660 nm)  
+- IR LED (880 nm)  
+- Photodiode  
+- Optical front‑end  
+- Ambient light suppression circuitry  
+
+**Form Factor:** Small breakout PCB  
+**Mounting:** Solderable header pins  
+**Color:** Black  
+
+**Dimensions:**  
+- Typical breakout: ~15 mm × 12 mm × 3 mm  
+- Mounting hole: 0.5 × 8.5 mm  
+
+**Weight:** Negligible  
+
+</details>
+
+<details>
+<summary><strong>Electrical & Wiring</strong></summary>
+
+**Operating Voltage:**  
+- **VIN:** 1.8V – 5V  
+- **Logic:** 1.8V – 3.3V (I²C pull‑up selectable)  
+
+**Power Notes:**  
+- Very low standby current (near zero when LEDs off)  
+- LED current controlled via software  
+
+**Interface:**  
+- **I²C** (standard, recommended)  
+
+**Pins:**  
+- **VIN → 3.3V**  
+- **GND → GND**  
+- **SCL → ESP32 I²C SCL**  
+- **SDA → ESP32 I²C SDA**  
+- **INT → optional interrupt pin**  
+- **RD → Red LED ground (usually not connected)**  
+- **IRD → IR LED ground (usually not connected)**  
+
+**Wiring Notes:**  
+- Use 3.3V logic on ESP32‑S3  
+- INT pin optional — useful for FIFO ready interrupts  
+- RD/IRD pins are internal LED grounds; leave unconnected  
+- Ensure optical window is unobstructed in enclosure  
+
+![](https://m.media-amazon.com/images/I/51X3Jxdm87L._SL1080_.jpg)
+
+</details>
+
+<details>
+<summary><strong>Compute & Software</strong></summary>
+
+**Data Outputs:**  
+- Raw PPG waveform  
+- Heart rate  
+- SpO₂ (requires algorithm)  
+- Ambient light level  
+- FIFO interrupt  
+
+**Supported Libraries:**  
+- SparkFun MAX3010x  
+- Adafruit MAX30102  
+- Maxim Integrated reference code  
+- ESP32 Arduino + ESP‑IDF compatible  
+
+**Sampling:**  
+- Configurable sample rate  
+- Configurable LED pulse amplitude  
+- FIFO buffer for continuous sampling  
+
+**Notes for ESP32‑S3:**  
+- Use hardware I²C for best stability  
+- Enable FIFO interrupt for low‑power sampling loops  
+
+</details>
+
+<details>
+<summary><strong>Notes</strong></summary>
+
+- Ideal for wrist‑mounted heart rate sensing  
+- Works perfectly with your LilyGo T‑Display‑S3  
+- Combine with MAX30003 for hybrid ECG + PPG monitoring  
+- Sensitive to motion → pair with IMU (BNO055) for artifact removal  
+- Keep sensor close to skin with minimal ambient light leakage  
+- Ensure optical window is clean and aligned with skin  
+
+</details>
+
+</details>
+
+<details>
+<summary><strong>u‑blox NEO‑M8N GNSS Receiver</strong></summary>
+
+**Product Page:** (add link if desired)  
+**Category:** Navigation Module (GNSS)
+
+![[MFG_NEO-M8N-0_web(640x640).jpg]]
+
+<details>
+<summary><strong>Hardware Overview</strong></summary>
+
+**Type:** Multi‑GNSS receiver module  
+**Supported Systems:** GPS, GLONASS, Galileo, BeiDou  
+**Form Factor:** 24‑pin SMD module  
+
+**Dimensions:**  
+- **Width:** ~12.2 mm  
+- **Length:** ~16.0 mm  
+- **Height:** ~2.4 mm  
+(NEO‑M8 series standard footprint)
+
+**Weight:** ~1–2 g  
+
+**Sensitivity:** –167 dBm  
+
+**Operating Temperature:** –40°C to +85°C  
+
+</details>
+
+<details>
+<summary><strong>Electrical & Wiring</strong></summary>
+
+**Supply Voltage:** 1.65V – 3.6V  
+**Recommended Voltage:** 3.3V  
+**Current (Tracking):** ~21 mA  
+
+**Interfaces:**  
+- **UART** (primary, easiest)  
+- **I²C**  
+- **SPI**  
+- **USB**  
+
+**Pinout (common breakout boards):**  
+- **VCC → 3.3V**  
+- **GND → GND**  
+- **TX → ESP32 RX**  
+- **RX → ESP32 TX**  
+- **SDA/SCL → optional (I²C)**  
+- **MISO/MOSI/SCK/CS → optional (SPI)**  
+- **PPS → optional (1 Hz timing pulse)**  
+
+**Wiring Notes:**  
+- UART is the simplest and most stable interface  
+- Requires an external active antenna (3.3V supply)  
+- PPS pin is useful for time‑sync or dead‑reckoning  
+- Ensure antenna ground plane clearance for best performance  
+
+</details>
+
+<details>
+<summary><strong>Compute & Software</strong></summary>
+
+**Protocols:**  
+- NMEA  
+- UBX (u‑blox binary protocol)  
+
+**Supported Platforms:**  
+- Arduino  
+- ESP‑IDF  
+- MicroPython  
+- u‑blox u‑center (PC configuration tool)  
+
+**Data Outputs:**  
+- Latitude / Longitude  
+- Altitude  
+- Speed  
+- Heading  
+- Satellite count  
+- Fix type (2D/3D)  
+- GNSS constellation data  
+
+**Fix Performance:**  
+- Cold start: ~26 s  
+- Warm start: ~1 s  
+- Hot start: ~1 s  
+- Typical accuracy: 2.5 m CEP  
+
+</details>
+
+<details>
+<summary><strong>Notes</strong></summary>
+
+- One of the most reliable GNSS modules for embedded systems  
+- Works perfectly with ESP32‑S3 via UART  
+- Requires clear sky view for best accuracy  
+- Very low power consumption for continuous tracking  
+- Supports multi‑GNSS → faster fixes + better accuracy  
+- Ideal for smartwatch navigation, outdoor tracking, and location logging  
+
+</details>
+
+</details>
+
+<details>
+<summary><strong>BME280 3.3V Environmental Sensor Module</strong></summary>
+
+**Product Page:**[link](https://www.amazon.com/Atmospheric-Pressure-Temperature-Humidity-GY-BME280/dp/B0F6L289KG?adgrpid=1333708169898083&dib=eyJ2IjoiMSJ9.UO2i0E9P-7yYVe25Pn5wLEp11D5WGgRx4oXD0Mq1kOmL4cpZZxftz3xXNMWcCn1Otqw90bBnMT95xybPx0KXPiyz_7Cq7dsBH7Db4Dl81axcynDdyA7K8f71Yq1sDlr0yDSU62lxYfpxBc49kwZmqakyELLSgzIreQZTUbVkDp6XcIWl_Q4tWG1P1JHhW8AqzwL_WxrvLNeKyvGe5bR1I8lFYOC291PX-pNO91b7GTk.5tDJhoJPCuHbL5pucmM9EWqMjt6uuhXNoTNfvNi9NMo&dib_tag=se&gb=2&hvadid=83357173070061&hvbmt=be&hvdev=c&hvexpln=0&hvlocphy=103567&hvnetw=o&hvocijid=11376273245629789973--&hvqmt=e&hvtargid=kwd-83357109378331%3Aloc-190&hydadcr=26611_11815929&keywords=bme280&mcid=9f57251d23e43c8c87ad02a83ecb0e1c&qid=1789489946&sr=8-1&th=1)
+
+**Category:** Environmental Sensor (Temp / Humidity / Pressure)
+
+![](https://m.media-amazon.com/images/I/61S4vLa-LCL._SL1500_.jpg)
+
+<details>
+<summary><strong>Hardware Overview</strong></summary>
+
+**Type:** Bosch BME280 breakout module  
+**Functions:** Temperature, humidity, barometric pressure  
+**Form Factor:** GY‑BME280 style breakout  
+
+**Dimensions:**  
+- Typical: ~15 mm × 12 mm × 2 mm  
+(Exact dimensions vary slightly by vendor)
+
+**Mounting:** 4‑pad PCB module
+
+</details>
+
+<details>
+<summary><strong>Electrical & Wiring</strong></summary>
+
+**Operating Voltage:** 1.71V – 3.6V  
+**Recommended Voltage:** 3.3V  
+**Logic Level:** 3.3V  
+
+**Interfaces:**  
+- **I²C** (default)  
+- **SPI** (optional)  
+
+**Pins:**  
+- VIN (3.3V)  
+- GND  
+- SCL  
+- SDA  
+- CSB (SPI)  
+- SDO (SPI / I²C address select)
+- 
+![](https://m.media-amazon.com/images/I/61ikk0hoZJL._SL1500_.jpg)
+
+**Power Consumption:**  
+- Ultra‑low power (µA‑level in sleep mode)  
+- ~1.8mA typical during measurement  
+
+**Accuracy:**  
+- **Temperature:** ±1°C  
+- **Humidity:** ±3% RH  
+- **Pressure:** ±1 hPa  
+- **Altitude resolution:** ±0.25m  
+
+**Wiring Notes:**  
+- Use I²C for simplest integration  
+- SDO pin sets I²C address (0x76 or 0x77)  
+- No onboard regulator → ensure 3.3V supply  
+- Works perfectly with ESP32‑S3 logic levels  
+
+</details>
+
+<details>
+<summary><strong>Compute & Software</strong></summary>
+
+**Driver Libraries:**  
+- Adafruit BME280  
+- SparkFun BME280  
+- Bosch official driver  
+
+**Supported Platforms:**  
+- Arduino  
+- ESP‑IDF  
+- MicroPython  
+
+**Data Output:**  
+- Temperature (°C)  
+- Humidity (%)  
+- Pressure (Pa / hPa)  
+- Derived altitude  
+
+</details>
+
+<details>
+<summary><strong>Notes</strong></summary>
+
+- Ideal for environmental sensing in wearables  
+- Very stable and low‑noise readings  
+- Better than BMP180/BMP183 (adds humidity + better accuracy)  
+- Works flawlessly with your LilyGo T‑Display‑S3  
+- Place away from heat sources (MCU, battery) for accurate readings  
+- Use low‑power mode for battery‑sensitive applications  
+
+</details>
+
+</details>
+
+
+
+
+
